@@ -17,7 +17,7 @@ else
 end
 %% CONFIGURE PATHS
 % APIRL PATH
-apirlPath = 'D:\Martin\apirl-code\';
+apirlPath = 'C:\Users\Encargado\Milagros\CodigosMatlab\apirl-code\';
 addpath(genpath([apirlPath pathBar 'matlab']));
 setenv('PATH', [getenv('PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
 setenv('LD_LIBRARY_PATH', [getenv('LD_LIBRARY_PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
@@ -44,10 +44,13 @@ refAt  = imref3d(size(tMu),xLimits,yLimits,zLimits);
 
 % Change the image sie, to the one of the phantom:
 PET.init_image_properties(refAct);
+
+
 %% SET APIRL FOR 2D
 % Change sinogram size:
-%param.sinogram_size.nRadialBins = 344;  % Leave the standard for mmr.
+%param.sinogram_size.nRadialBins = 343;  % Leave the standard for mmr.
 %param.sinogram_size.nAnglesBins = 252;
+% aca confugaramos para las caracteristicas de 2D
 param.nSubsets = 1;
 param.sinogram_size.span = -1;    % Span 0 is multi slice 2d.
 param.sinogram_size.nRings = 1; % for span 1, 1 ring.
@@ -60,12 +63,14 @@ greyMatterVoxelValues = max(tAct(:));
 % Scale factor:
 scaleFactor = countsInGreyMatterVoxels./greyMatterVoxelValues;
 %% GENERATE SIMULATED DATA SET 1
+% Recontruimos a nivel imagen 
 % Naive approach in iamge space.
-indicesSlices = find(sum(sum(tAct>0)));
+
+indicesSlices = find(sum(sum(tAct>0))); % = 117 
 for i = 1 : numel(indicesSlices)
-    groundTruth(:,:,i) = tAct(:,:,indicesSlices(i));
-    groundTruthScaled(:,:,i) = groundTruth(:,:,i).*scaleFactor;
-    noisyDataSet1(:,:,i) = poissrnd(groundTruthScaled(:,:,i));
+    groundTruth(:,:,i) = tAct(:,:,indicesSlices(i)); 
+    groundTruthScaled(:,:,i) = groundTruth(:,:,i).*scaleFactor; % escalamos por el factor 
+    noisyDataSet1(:,:,i) = poissrnd(groundTruthScaled(:,:,i)); % generamos ruido poisson sobre la imagen
 end
 % Show the full dataset:
 scaleForVisualization = 1.2*max(max(max(groundTruthScaled))); % use the same scale for the simulated data.
@@ -78,17 +83,18 @@ for i = 1 : size(groundTruthScaled,3)
     pause(0.1);
 end
 %% GENERATE SIMULATED DATA SET 2
-scaleAdjustment = 1;
+scaleAdjustment = 50; % -> 1.6e6
+% Recontruimos a nivel sinograma
 % 2d simulation for each slice:
 for i = 1 : numel(indicesSlices)
     groundTruth(:,:,i) = tAct(:,:,indicesSlices(i)); % The same as before
     groundTruthScaled(:,:,i) = groundTruth(:,:,i).*scaleFactor;
-    attenuationMap(:,:,i) = tMu(:,:,indicesSlices(i));
+    attenuationMap(:,:,i) = tMu(:,:,indicesSlices(i)); % para la recontruccion
    
     % Counts to simulate:
     counts = sum(sum(groundTruthScaled(:,:,i))) * scaleAdjustment; % Counts in the scaled ground truth.
-    randomsFraction = 0.1;
-    scatterFraction = 0.25;
+    randomsFraction = 0.1;  %eventos que coinciden en tiempo pero no son de la linea trazada
+    scatterFraction = 0.25; %efectos de la radiacion dispersa
     truesFraction = 1 - randomsFraction - scatterFraction;
 
     % Geometrical projection:
@@ -115,7 +121,7 @@ for i = 1 : numel(indicesSlices)
     s_withoutNorm = s_withoutNorm .* scale_factor_scatter;
     % noise for the scatter:
     s = poissrnd(s_withoutNorm);
-    % Add randoms and scatter@
+    % Add randoms and scatter@ and poisson noise
     simulatedSinogram = y_poisson + s + r;
 
 
@@ -133,3 +139,100 @@ for i = 1 : size(groundTruthScaled,3)
     imshow(noisyDataSet2(:,:,i),[0 scaleForVisualization]);
     pause(0.1);
 end
+
+%% Save workspace
+
+filename = 'ws2d.mat';
+save(filename)
+%%
+
+load('ws2d.mat')
+%% MASCARAS
+
+for i = 1 : numel(indicesSlices)
+    mask_materia_gris(:,:,i) = (tAct(:,:,indicesSlices(i))==9000); 
+    mask_materia_blanca(:,:,i) = (tAct(:,:,indicesSlices(i))==3400);
+   
+end
+
+ noisyDataSet1_materia_gris = noisyDataSet1 .* mask_materia_gris;
+ noisyDataSet1_materia_blanca = noisyDataSet1 .* mask_materia_blanca;
+    
+ noisyDataSet2_materia_gris = noisyDataSet2 .* mask_materia_gris;
+ noisyDataSet2_materia_blanca = noisyDataSet2 .* mask_materia_blanca;
+ 
+%% DATA SET 1
+
+% Materia gris
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet1(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,3);
+    imshow(noisyDataSet1_materia_gris(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+% Materia blanca
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet1(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,3);
+    imshow(noisyDataSet1_materia_blanca(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+ 
+%% DATA SET 2
+
+% Materia gris
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet2(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,3);
+    imshow(noisyDataSet2_materia_gris(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+% Materia blanca
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet2(:,:,i),[0 scaleForVisualization*0.7]);
+    subplot(1,3,3);
+    imshow(noisyDataSet2_materia_blanca(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+%% ANALISIS DE DATOS
+
+noisyDataSet1_materia_gris(noisyDataSet1_materia_gris==0) = [];
+noisyDataSet1_materia_blanca(noisyDataSet1_materia_blanca==0) = [];
+
+noisyDataSet2_materia_gris(noisyDataSet2_materia_gris==0) = [];
+noisyDataSet2_materia_blanca(noisyDataSet2_materia_blanca==0) = [];
+    
+
+figure, 
+subplot(2,2,1), histogram(noisyDataSet1_materia_gris,22), title('SET 1 - G')
+subplot(2,2,2), histogram(noisyDataSet1_materia_blanca,12), title('SET 1 - B')
+subplot(2,2,3), histogram(noisyDataSet2_materia_gris,21), title('SET 2 - G')
+subplot(2,2,4), histogram(noisyDataSet2_materia_blanca,22), title('SET 2 - B')
+
+
+
+
+
+
+
+
