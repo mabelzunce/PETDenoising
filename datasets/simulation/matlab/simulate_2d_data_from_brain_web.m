@@ -41,12 +41,12 @@ for i = 3:length(imgDir)
     n = i-2;
     [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), [344 344 127], [2.08625 2.08625 2.03125]);
 
-    pet_rescaled_all_images(:,:,:,n) = pet_rescaled;
-    mumap_rescaled_rescaled_all_images(:,:,:,n) = mumap_rescaled;
-    t1_rescaled_all_images(:,:,:,n) = t1_rescaled;
-    t2_rescaled_all_images(:,:,:,n) = t2_rescaled;
-    classified_tissue_rescaled_all_images(:,:,:,n) = classified_tissue_rescaled;
-    refImage_all_images(:,:,:,n) = refImage;
+    pet_rescaled_all_images{n} = pet_rescaled;
+    mumap_rescaled_rescaled_all_images{n} = mumap_rescaled;
+    t1_rescaled_all_images{n} = t1_rescaled;
+    t2_rescaled_all_images{n} = t2_rescaled;
+    classified_tissue_rescaled_all_images{n} = classified_tissue_rescaled;
+    refImage_all_images{n} = refImage;
 end
 
 
@@ -54,7 +54,7 @@ end
 %% PHANTOM TO USE
 
 % Change the image sie, to the one of the phantom:
-PET.init_image_properties(refImage_all_images(:,:,:,1));
+PET.init_image_properties(refImage_all_images{1});
 
 
 %% SET APIRL FOR 2D
@@ -65,12 +65,13 @@ PET.init_image_properties(refImage_all_images(:,:,:,1));
 param.nSubsets = 1;
 param.sinogram_size.span = -1;    % Span 0 is multi slice 2d.
 param.sinogram_size.nRings = 1; % for span 1, 1 ring.
-param.image_size.matrixSize = [refImage_all_images(:,:,:,1).ImageSize(1:2) 1];
+param.image_size.matrixSize = [refImage_all_images{1}.ImageSize(1:2) 1];
 PET.Revise(param);
 %% NOISE LEVEL
 countsInGreyMatterVoxels = 8;
 % Grey matter value:
-greyMatterVoxelValues = max(pet_rescaled_all_images(:));
+% greyMatterVoxelValues = max(pet_rescaled_all_images{1});
+greyMatterVoxelValues = 128;
 % Scale factor:
 scaleFactor = countsInGreyMatterVoxels./greyMatterVoxelValues;
 %% GENERATE SIMULATED DATA SET 1
@@ -80,12 +81,12 @@ scaleFactor = countsInGreyMatterVoxels./greyMatterVoxelValues;
 % Para cada sujeto ... 
 
 
-for n = 1 : size(pet_rescaled_all_images,4)
-    indicesSlices = find(sum(sum(pet_rescaled_all_images(:,:,:,n)>0))); % = 86 
+for n = 1 : size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
     for i = 1 : numel(indicesSlices)
-        groundTruth(:,:,i,n) = pet_rescaled_all_images(:,:,indicesSlices(i)); 
-        groundTruthScaled(:,:,i,n) = groundTruth(:,:,i,n).*scaleFactor; % escalamos por el factor 
-        noisyDataSet1(:,:,i,n) = poissrnd(groundTruthScaled(:,:,i,n)); % generamos ruido poisson sobre la imagen
+        groundTruth{n}(:,:,i) = pet_rescaled_all_images{n}(:,:,indicesSlices(i)); 
+        groundTruthScaled{n}(:,:,i) = groundTruth{n}(:,:,i).*scaleFactor; % escalamos por el factor 
+        noisyDataSet1{n}(:,:,i) = poissrnd(groundTruthScaled{n}(:,:,i)); % generamos ruido poisson sobre la imagen
     end
 end
 
@@ -112,15 +113,15 @@ num_slice = 60
 
 % Mismos slices de diferentes sujetos - Phantom orig
 figure;
-for n = 1: size(pet_rescaled_all_images,4)
-    subplot(4,5,n), imshow(pet_rescaled_all_images(:,:,num_slice,n),[]) 
+for n = 1: size(pet_rescaled_all_images,2)
+    subplot(4,5,n), imshow(pet_rescaled_all_images{n}(:,:,num_slice),[]) 
 end
 
 % Mismos slices de diferentes sujetos -- RUIDO
 figure;
-for n = 1: size(pet_rescaled_all_images,4)
-    scaleForVisualization = 1.2*max(max(max(groundTruthScaled(:,:,:,n))));
-    subplot(4,5,n), imshow(noisyDataSet1(:,:,num_slice,n),[0 scaleForVisualization]) 
+for n = 1: size(pet_rescaled_all_images,2)
+    scaleForVisualization = 1.2*max(max(max(groundTruthScaled{n})));
+    subplot(4,5,n), imshow(noisyDataSet1{n}(:,:,num_slice),[0 scaleForVisualization]) 
 end
 
 
@@ -128,7 +129,7 @@ end
 
 save('2d-PhantomFromBrainWeb.mat') %
 
-save('2d-noisyDataSet1FromBrainWeb-AllSubject.mat','noisyDataSet1','-v7.3')
+save('2d-noisyDataSet1v2FromBrainWeb-AllSubject.mat','noisyDataSet1','-v7.3')
 
 save('2d-ClassifiedTissueAllSubject.mat', 'classified_tissue_rescaled_all_images', '-v7.3')
 save('2d-groundTruthDataSet1FromBrainWeb-AllSubject.mat', 'groundTruth', '-v7.3')
@@ -153,27 +154,78 @@ load('2d-T1AllSubject.mat')
 
 
 %% GENERATE SIMULATED DATA SET 2
-scaleAdjustment = 50; % -> 1.6e6
-% Recontruimos a nivel sinograma
-% 2d simulation for each slice :
-
-for n = 1: 1%size(pet_rescaled_all_images,4)
-    for i = 1 : numel(indicesSlices)
-        groundTruth(:,:,i,n) = pet_rescaled_all_images(:,:,indicesSlices(i),n); % The same as before
-        groundTruthScaled(:,:,i,n) = groundTruth(:,:,i,n).*scaleFactor;
-        attenuationMap(:,:,i,n) = mumap_rescaled_rescaled_all_images(:,:,indicesSlices(i),n); % para la recontruccion
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 43
+        
+        groundTruth{n}(:,:,i) = pet_rescaled_all_images{n}(:,:,indicesSlices(i)); % The same as before
+        groundTruthScaled{n}(:,:,i) = groundTruth{n}(:,:,i).*scaleFactor;
+        attenuationMap{n}(:,:,i) = mumap_rescaled_rescaled_all_images{n}(:,:,indicesSlices(i)); % para la recontruccion
    
         % Counts to simulate:
-        counts = sum(sum(groundTruthScaled(:,:,i,n))) * scaleAdjustment; % Counts in the scaled ground truth.
+        counts = sum(sum(groundTruthScaled{n}(:,:,i))) * scaleAdjustment; % Counts in the scaled ground truth.
         randomsFraction = 0.1;  %eventos que coinciden en tiempo pero no son de la linea trazada
         scatterFraction = 0.25; %efectos de la radiacion dispersa
         truesFraction = 1 - randomsFraction - scatterFraction;
 
         % Geometrical projection:
-        y = PET.P(groundTruthScaled(:,:,i,n) ); % for any other span
+        y = PET.P(groundTruthScaled{n}(:,:,i)); % for any other span
 
         % Multiplicative correction factors:
-        acf= PET.ACF(attenuationMap(:,:,:,n), refImage_all_images(:,:,:,n));
+        acf= PET.ACF(attenuationMap{n}(:,:,:), refImage_all_images{n}(:,:,:));
+        % Convert into factors:
+        af = acf;
+        af(af~=0) = 1./ af(af~=0);
+        % Introduce poission noise:
+        y = y.*af;
+        scale_factor = counts*truesFraction/sum(y(:));
+        y_poisson = y.*scale_factor;
+
+        % Additive factors:
+        r = PET.R(counts*randomsFraction); 
+        % Poisson distribution:
+        r = r;
+
+        counts_scatter = counts*scatterFraction;
+        s_withoutNorm = PET.S(y);
+        scale_factor_scatter = counts_scatter/sum(s_withoutNorm(:));
+        s_withoutNorm = s_withoutNorm .* scale_factor_scatter;
+        % noise for the scatter:
+        s = s_withoutNorm;
+        % Add randoms and scatter@ and poisson noise
+        simulatedSinogram = y_poisson + s + r;
+
+
+        % RECONSTRUCT the sinogram
+        sensImage = PET.Sensitivity(af);
+        recon = PET.ones();
+        referenceSlice = PET.OPOSEM(simulatedSinogram,s+r, sensImage,recon, ceil(60/PET.nSubsets));
+    end
+end
+
+%% scaleAdjustment = 50; % -> 1.6e6
+% Recontruimos a nivel sinograma
+% 2d simulation for each slice :
+
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        
+        groundTruth{n}(:,:,i) = pet_rescaled_all_images{n}(:,:,indicesSlices(i)); % The same as before
+        groundTruthScaled{n}(:,:,i) = groundTruth{n}(:,:,i).*scaleFactor;
+        attenuationMap{n}(:,:,i) = mumap_rescaled_rescaled_all_images{n}(:,:,indicesSlices(i)); % para la recontruccion
+   
+        % Counts to simulate:
+        counts = sum(sum(groundTruthScaled{n}(:,:,i))) * scaleAdjustment; % Counts in the scaled ground truth.
+        randomsFraction = 0.1;  %eventos que coinciden en tiempo pero no son de la linea trazada
+        scatterFraction = 0.25; %efectos de la radiacion dispersa
+        truesFraction = 1 - randomsFraction - scatterFraction;
+
+        % Geometrical projection:
+        y = PET.P(groundTruthScaled{n}(:,:,i)); % for any other span
+
+        % Multiplicative correction factors:
+        acf= PET.ACF(attenuationMap{n}(:,:,:), refImage_all_images{n}(:,:,:));
         % Convert into factors:
         af = acf;
         af(af~=0) = 1./ af(af~=0);
@@ -200,28 +252,110 @@ for n = 1: 1%size(pet_rescaled_all_images,4)
         % RECONSTRUCT the sinogram
         sensImage = PET.Sensitivity(af);
         recon = PET.ones();
-        noisyDataSet2(:,:,i,n) = PET.OPOSEM(simulatedSinogram,s+r, sensImage,recon, ceil(60/PET.nSubsets));
+        noisyDataSet2{n}(:,:,i) = PET.OPOSEM(simulatedSinogram,s+r, sensImage,recon, ceil(60/PET.nSubsets));
     end
 end
-%%
-for n = 1 : size(pet_rescaled_all_images,4)
-    scaleForVisualization = 1.2*max(max(max(groundTruthScaled(:,:,:,n)))); % use the same scale for the simulated data.
-    figure;
-    
-    for i = 1 : size(groundTruthScaled,3,n)
-        subplot(1,2,1);
-        imshow(groundTruthScaled(:,:,i,n),[0 scaleForVisualization]);
-        subplot(1,2,2);
-        imshow(noisyDataSet2(:,:,i,n),[0 scaleForVisualization]);
-        pause(0.1);
-    end
+%% Mostrar un slice de cada sujeto (con/sin ruido) 
+num_slice = 60
 
+% Mismos slices de diferentes sujetos - Phantom orig
+figure;
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    subplot(4,5,n), imshow(pet_rescaled_all_images{n}(:,:,num_slice),[]) 
 end
+
+% Mismos slices de diferentes sujetos -- RUIDO
+figure;
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    scaleForVisualization = 1.2*max(max(max(groundTruthScaled{n})));
+    subplot(4,5,n), imshow(noisyDataSet2{n}(:,:,num_slice),[0 scaleForVisualization]) 
+end
+
 
 %% Guardar DATASET 2
 
-save('2d-noisyDataSet2FromBrainWeb-AllSubject.mat','noisyDataSet2','-v7.3')
+save('2d-noisyDataSet2FromBrainWeb-1erSubject.mat','noisyDataSet2','-v7.3')
 
 
+%% MASCARAS
 
+for i = 1 : numel(indicesSlices)
+    mask_materia_gris(:,:,i) = (pet_rescaled_all_images(:,:,indicesSlices(i),1)==128); 
+    mask_materia_blanca(:,:,i) = (pet_rescaled_all_images(:,:,indicesSlices(i),1)==32);
+   
+end
+
+ noisyDataSet1_materia_gris = (noisyDataSet1(:,:,:,1)) .* mask_materia_gris;
+ noisyDataSet1_materia_blanca = (noisyDataSet1(:,:,:,1)) .* mask_materia_blanca;
+    
+ noisyDataSet2_materia_gris = noisyDataSet2 .* mask_materia_gris;
+ noisyDataSet2_materia_blanca = noisyDataSet2 .* mask_materia_blanca;
+ 
+%% DATA SET 1
+
+% Materia gris
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet1(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,3);
+    imshow(noisyDataSet1_materia_gris(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+% Materia blanca
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet1(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,3);
+    imshow(noisyDataSet1_materia_blanca(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+ 
+%% DATA SET 2
+
+% Materia gris
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet2(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,3);
+    imshow(noisyDataSet2_materia_gris(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+% Materia blanca
+figure;
+for i = 1 : size(groundTruthScaled,3)
+    subplot(1,3,1);
+    imshow(groundTruthScaled(:,:,i),[0 scaleForVisualization]);
+    subplot(1,3,2);
+    imshow(noisyDataSet2(:,:,i),[0 scaleForVisualization*0.7]);
+    subplot(1,3,3);
+    imshow(noisyDataSet2_materia_blanca(:,:,i),[0 scaleForVisualization]);
+    pause(0.1);
+end
+
+%% ANALISIS DE DATOS
+
+noisyDataSet1_materia_gris(noisyDataSet1_materia_gris==0) = [];
+noisyDataSet1_materia_blanca(noisyDataSet1_materia_blanca==0) = [];
+
+noisyDataSet2_materia_gris(noisyDataSet2_materia_gris==0) = [];
+noisyDataSet2_materia_blanca(noisyDataSet2_materia_blanca==0) = [];
+    
+
+figure, 
+subplot(2,2,1), histogram(noisyDataSet1_materia_gris,22), title('SET 1 - G')
+subplot(2,2,2), histogram(noisyDataSet1_materia_blanca,12), title('SET 1 - B')
+subplot(2,2,3), histogram(noisyDataSet2_materia_gris,21), title('SET 2 - G')
+subplot(2,2,4), histogram(noisyDataSet2_materia_blanca,22), title('SET 2 - B')
 
