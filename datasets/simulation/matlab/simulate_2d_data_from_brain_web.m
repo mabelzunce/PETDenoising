@@ -130,16 +130,18 @@ for n = 1: size(pet_rescaled_all_images,2)
     indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
     for i = 1 : numel(indicesSlices)
         greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
-        mask_noisySlice{n}(:,:,i) = (noisyDataSet1{n}(:,:,i)) .* greymask;
+        mask_noisyDataSet1{n}(:,:,i) = (noisyDataSet1{n}(:,:,i)) .* greymask;
     end
 end
+%%
+
 
 for n = 1: size(pet_rescaled_all_images,2)
-    mask_noisySlice{n}(mask_noisySlice{n}==0) =[];
+    mask_noisyDataSet1{n}(mask_noisyDataSet1{n}==0) =[];
 end
 
-meanValue_noisyDataSet1 = mean(cell2mat(mask_noisySlice))
-stdValue_noisyDataSet1 = std(cell2mat(mask_noisySlice))
+meanValue_noisyDataSet1 = mean(cell2mat(mask_noisyDataSet1))
+stdValue_noisyDataSet1 = std(cell2mat(mask_noisyDataSet1))
 
 factorMeanStd_dataSet1 = meanValue_noisyDataSet1/stdValue_noisyDataSet1
 
@@ -241,9 +243,9 @@ norm = (greyMatterVoxelValues.*scaleFactor)/meanValue
 
 %% 
 
-for n = 1: 1%size(pet_rescaled_all_images,2)
+for n = 1: size(pet_rescaled_all_images,2)
     indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
-    for i = 43 %1 : numel(indicesSlices)
+    for i = 1 : numel(indicesSlices)
         
         groundTruth{n}(:,:,i) = pet_rescaled_all_images{n}(:,:,indicesSlices(i)); % The same as before
         groundTruthScaled{n}(:,:,i) = groundTruth{n}(:,:,i).*scaleFactor;
@@ -291,8 +293,6 @@ for n = 1: 1%size(pet_rescaled_all_images,2)
     end
 end
 
-scaleForVisualization = 1.2*max(max(max(groundTruthScaled{1})))
-figure,imshow(noisyDataSet2{1}(:,:,43),[0 scaleForVisualization])
 
 %% Analisis Slice 43 (en uso)
 
@@ -311,7 +311,56 @@ stdValue_noisyDataSet2_slice43 = std(mask_noisyDataSet_slice43)
 
 factorMeanStd_slice43NoisyDataSet1 = meanValue_noisyDataSet2_slice43/stdValue_noisyDataSet2_slice43
 
-%figure, histogram(mask_noisyDataSet_slice43,55)
+%% %% Analisis SLICES
+
+% data set 1 
+
+for n = 1:1
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0)));
+    for i = 1 : numel(indicesSlices)
+        array = mask_noisyDataSet1{n}(:,:,i);
+        array(array == 0) = [];
+        stdSliceDataSet1(i) = std(array);
+    end
+    arraySlice = mask_noisyDataSet1{n};
+    arraySlice(arraySlice == 0) = [];
+    meanSliceDataSet1 = mean(arraySlice);
+end
+
+
+
+% data set 2
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
+        mask_noisyDataSet2{n}(:,:,i) = (noisyDataSet2{n}(:,:,i)) .* greymask;
+    end
+end
+
+
+for n = 1:1
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0)));
+    for i = 1 : numel(indicesSlices)
+        array = mask_noisyDataSet2{n}(:,:,i);
+        array(array == 0) = [];
+        stdSliceDataSet2(i) = std(array);
+    end
+    
+    arraySlice = mask_noisyDataSet2{n};
+    arraySlice(arraySlice == 0) = [];
+    meanSliceDataSet2 = mean(arraySlice);
+end
+
+
+figure,
+subplot(1,2,1),scatter([0:max(stdSliceDataSet1)/85:max(stdSliceDataSet1)],stdSliceDataSet1)
+hold on
+plot([0, max(stdSliceDataSet1)], [meanSliceDataSet1, meanSliceDataSet1])
+
+subplot(1,2,2),scatter([0:max(stdSliceDataSet2)/85:max(stdSliceDataSet2)],stdSliceDataSet2)
+hold on
+plot([0, max(stdSliceDataSet2)], [meanSliceDataSet2, meanSliceDataSet2])
 
 %% Mostrar un slice de cada sujeto (con/sin ruido) 
 num_slice = 60
