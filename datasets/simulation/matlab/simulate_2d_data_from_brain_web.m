@@ -124,7 +124,7 @@ for n = 1: size(pet_rescaled_all_images,2)
     subplot(4,5,n), imshow(noisyDataSet1{n}(:,:,num_slice),[0 scaleForVisualization]) 
 end
 
-%% Analisis dataset
+%% Analisis de dataset COMPLETO
 
 for n = 1: size(pet_rescaled_all_images,2)
     indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
@@ -133,8 +133,6 @@ for n = 1: size(pet_rescaled_all_images,2)
         mask_noisyDataSet1{n}(:,:,i) = (noisyDataSet1{n}(:,:,i)) .* greymask;
     end
 end
-%%
-
 
 for n = 1: size(pet_rescaled_all_images,2)
     mask_noisyDataSet1{n}(mask_noisyDataSet1{n}==0) =[];
@@ -294,24 +292,64 @@ for n = 1: size(pet_rescaled_all_images,2)
 end
 
 
-%% Analisis Slice 43 (en uso)
+%% Analisis Slice 43 , DATA SET 1 y DATA SET 2
 
 greymask_referenceSlice =(pet_rescaled_all_images{1}(:,:,indicesSlices(43))==128);
-mask_noisyDataSet_slice43 = noisyDataSet2{1}(:,:,43) .* greymask_referenceSlice;
+mask_noisyDataSet1_slice43 = noisyDataSet1{1}(:,:,43) .* greymask_referenceSlice;
+
+% figure;
+% subplot(2,2,1), imshow(pet_rescaled_all_images{1}(:,:,indicesSlices(43)),[])
+% subplot(2,2,2), imshow(noisyDataSet1{1}(:,:,43),[0 scaleForVisualization])
+% subplot(2,2,3), imshow(greymask_referenceSlice,[])
+% subplot(2,2,4), imshow(mask_noisyDataSet1_slice43)
+
+mask_noisyDataSet1_slice43(mask_noisyDataSet1_slice43==0) = [];
+meanValue_noisyDataSet1_slice43 = mean(mask_noisyDataSet1_slice43)
+stdValue_noisyDataSet1_slice43 = std(mask_noisyDataSet1_slice43)
+
+factorMeanStd_slice43NoisyDataSet1 = meanValue_noisyDataSet1_slice43/stdValue_noisyDataSet1_slice43;
+
+greymask_referenceSlice =(pet_rescaled_all_images{1}(:,:,indicesSlices(43))==128);
+mask_noisyDataSet2_slice43 = noisyDataSet2{1}(:,:,43) .* greymask_referenceSlice;
+
+% figure;
+% subplot(2,2,1), imshow(pet_rescaled_all_images{1}(:,:,indicesSlices(43)),[])
+% subplot(2,2,2), imshow(noisyDataSet2{1}(:,:,43),[0 scaleForVisualization])
+% subplot(2,2,3), imshow(greymask_referenceSlice,[])
+% subplot(2,2,4), imshow(mask_noisyDataSet2_slice43)
+
+mask_noisyDataSet2_slice43(mask_noisyDataSet2_slice43==0) = [];
+meanValue_noisyDataSet2_slice43 = mean(mask_noisyDataSet2_slice43)
+stdValue_noisyDataSet2_slice43 = std(mask_noisyDataSet2_slice43)
+
+factorMeanStd_slice43NoisyDataSet2 = meanValue_noisyDataSet2_slice43/stdValue_noisyDataSet2_slice43;
 
 figure;
-subplot(2,2,1), imshow(pet_rescaled_all_images{1}(:,:,indicesSlices(43)),[])
-subplot(2,2,2), imshow(noisyDataSet2{1}(:,:,43),[0 scaleForVisualization])
-subplot(2,2,3), imshow(greymask_referenceSlice,[])
-subplot(2,2,4), imshow(mask_noisyDataSet_slice43)
+subplot(1,3,1), imshow(pet_rescaled_all_images{1}(:,:,indicesSlices(43)),[])
+subplot(1,3,2), imshow(noisyDataSet1{1}(:,:,43),[0 scaleForVisualization])
+subplot(1,3,3), imshow(noisyDataSet2{1}(:,:,43),[0 scaleForVisualization])
 
-mask_noisyDataSet_slice43(mask_noisyDataSet_slice43==0) = [];
-meanValue_noisyDataSet2_slice43 = mean(mask_noisyDataSet_slice43)
-stdValue_noisyDataSet2_slice43 = std(mask_noisyDataSet_slice43)
+%% %% Analisis de cada uno de los SLICES Sujeto 1
 
-factorMeanStd_slice43NoisyDataSet1 = meanValue_noisyDataSet2_slice43/stdValue_noisyDataSet2_slice43
+clear var mask_noisyDataSet1
+clear var mask_noisyDataSet2
 
-%% %% Analisis SLICES
+for n = 1: size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
+        mask_noisyDataSet1{n}(:,:,i) = (noisyDataSet1{n}(:,:,i)) .* greymask;
+    end
+end
+
+for n = 1: size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
+        mask_noisyDataSet2{n}(:,:,i) = (noisyDataSet2{n}(:,:,i)) .* greymask;
+    end
+end
+
 
 % data set 1 
 
@@ -383,5 +421,161 @@ subplot(1,2,1), imshow(noisyDataSet1{1}(:,:,43),[0 scaleForVisualization])
 subplot(1,2,2), imshow(noisyDataSet2{1}(:,:,43),[0 scaleForVisualization])
 %% Guardar DATASET 2
 
-save('2d-noisyDataSet2FromBrainWeb-1erSubject.mat','noisyDataSet2','-v7.3')
+save('2d-noisyDataSet2FromBrainWebAllSubject.mat','noisyDataSet2','-v7.3')
 
+%%
+load('2d-noisyDataSet1FromBrainWeb-AllSubject.mat')
+load('2d-noisyDataSet2FromBrainWebAllSubject.mat')
+load('2d-PetRescaledAllSubject.mat')
+load('2d-PhantomFromBrainWeb.mat')
+%% Mostrar un slice de cada sujeto (con/sin ruido) 
+% DATA SET 1 Y DATA SET 2
+num_slice = 60
+
+% Mismos slices de diferentes sujetos - Phantom orig
+figure;
+for n = 1: size(pet_rescaled_all_images,2)
+    subplot(4,5,n), imshow(pet_rescaled_all_images{n}(:,:,num_slice),[]) 
+end
+
+% Mismos slices de diferentes sujetos -- RUIDO
+figure;
+for n = 1: size(pet_rescaled_all_images,2)
+    scaleForVisualization = 1.2*max(max(max(groundTruthScaled{n})));
+    subplot(4,5,n), imshow(noisyDataSet1{n}(:,:,num_slice),[0 scaleForVisualization]) 
+end
+
+% Mismos slices de diferentes sujetos -- RUIDO
+figure;
+for n = 1: size(pet_rescaled_all_images,2)
+    scaleForVisualization = 1.2*max(max(max(groundTruthScaled{n})));
+    subplot(4,5,n), imshow(noisyDataSet2{n}(:,:,num_slice),[0 scaleForVisualization]) 
+end
+
+%% Analisis DATA SET 1 y DATA SET 2
+
+clear var mask_noisyDataSet1
+clear var mask_noisyDataSet2
+
+for n = 1: size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
+        mask_noisyDataSet1{n}(:,:,i) = (noisyDataSet1{n}(:,:,i)) .* greymask;
+    end
+end
+
+% DataSet1
+for n = 1: size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
+        mask_noisyDataSet1{n}(:,:,i) = (noisyDataSet1{n}(:,:,i)) .* greymask;
+    end
+end
+
+for n = 1: size(pet_rescaled_all_images,2)
+    mask_noisyDataSet1{n}(mask_noisyDataSet1{n}==0) =[];
+end
+
+meanValue_noisyDataSet1 = mean(cell2mat(mask_noisyDataSet1))
+stdValue_noisyDataSet1 = std(cell2mat(mask_noisyDataSet1))
+
+% DataSet2
+
+for n = 1: size(pet_rescaled_all_images,2)
+    indicesSlices = find(sum(sum(pet_rescaled_all_images{n}(:,:,:)>0))); % = 86 
+    for i = 1 : numel(indicesSlices)
+        greymask =(pet_rescaled_all_images{n}(:,:,indicesSlices(i))==128);
+        mask_noisyDataSet2{n}(:,:,i) = (noisyDataSet2{n}(:,:,i)) .* greymask;
+    end
+end
+
+for n = 1: size(pet_rescaled_all_images,2)
+    mask_noisyDataSet2{n}(mask_noisyDataSet2{n}==0) =[];
+end
+
+meanValue_noisyDataSet2 = mean(cell2mat(mask_noisyDataSet2))
+stdValue_noisyDataSet2 = std(cell2mat(mask_noisyDataSet2))
+
+%% MSE DATA SET 1
+cantSlices = 0;
+for n = 1: size(pet_rescaled_all_images,2)
+    cantSlices = cantSlices + size(noisyDataSet1{n},3);
+end
+
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    restaCuadrado{n}(:,:,:) = ((noisyDataSet1{n}(:,:,:) - groundTruth{n}(:,:,:)).^2);
+end
+
+sumTotal = 0;
+
+for n = 1: 1%size(pet_rescaled_all_images,2)
+    array = restaCuadrado{n}(:,:,:);
+    array(array == 0) = [];
+    sumTotal = sumTotal + sum(array);
+end
+
+cantVoxel = 344*344*cantSlices;
+mse_dataSet1 = sumTotal/cantVoxel
+
+%% MSE DATA SET 2
+
+for n = 1: size(pet_rescaled_all_images,2)
+    restaCuadrado{n}(:,:,:) = ((noisyDataSet1{n}(:,:,:) - groundTruth{n}(:,:,:)).^2);
+end
+
+sumTotal = 0;
+
+for n = 1: size(pet_rescaled_all_images,2)
+    
+    array = restaCuadrado{n}(:,:,:);
+    array(array == 0) = [];
+    sumTotal = sumTotal + sum(array);
+end
+
+cantVoxel = 344*344*cantSlices;
+mse_dataSet1 = sumTotal/cantVoxel
+
+%% Guardar formato nifti
+for n = 1: size(pet_rescaled_all_images,2)
+    if n > 1
+        posicion = posicion + size(noisyDataSet1{n-1},3);
+    else
+        posicion = 0;
+    end
+    for i = 1: size(noisyDataSet1{n},3)
+        array = noisyDataSet1{n}(:,:,i);
+        noisyDataSet1Array(:,:,i+posicion) = array;
+    end
+end
+
+for n = 1: size(pet_rescaled_all_images,2)
+    if n > 1
+        posicion = posicion + size(noisyDataSet1{n-1},3);
+    else
+        posicion = 0;
+    end
+    for i = 1: size(noisyDataSet2{n},3)
+        array = noisyDataSet2{n}(:,:,i);
+        noisyDataSet2Array(:,:,i+posicion) = array;
+    end
+end
+
+for n = 1: size(groundTruth,2)
+    if n > 1
+        posicion = posicion + size(noisyDataSet1{n-1},3);
+    else
+        posicion = 0;
+    end
+    for i = 1: size(groundTruth{n},3)
+        array = groundTruth{n}(:,:,i);
+        groundTruthArray(:,:,i+posicion) = array;
+    end
+end
+
+
+%%
+niftiwrite(noisyDataSet1Array,'noisyDataSet1.nii')
+niftiwrite(noisyDataSet1Array,'noisyDataSet2.nii')
+niftiwrite(noisyDataSet1Array,'groundTruth.nii')
