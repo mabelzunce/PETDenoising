@@ -17,7 +17,7 @@ else
 end
 %% CONFIGURE PATHS
 % APIRL PATH
-apirlPath = 'C:\Users\Encargado\Milagros\CodigosMatlab\apirl-code\';
+apirlPath = 'C:\Users\ecyt\Desktop\Milagros\apirl-code\';
 addpath(genpath([apirlPath pathBar 'matlab']));
 setenv('PATH', [getenv('PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
 setenv('LD_LIBRARY_PATH', [getenv('LD_LIBRARY_PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
@@ -33,7 +33,7 @@ PET = classGpet(PET);
 %% BRAIN WEB IMAGES
 % se cargan y se generan los fantomas
 
-brainWebPath = 'C:\Users\Encargado\Milagros\BrainWEB\'
+brainWebPath = 'C:\Users\ecyt\Desktop\Milagros\BrainWEB\'
 imgDir = dir ([brainWebPath])
 
 
@@ -574,8 +574,20 @@ for n = 1: size(groundTruth,2)
     end
 end
 
+%% 
+
+groundTruthArray = permute(groundTruthArray, [2 1 3]);
+noisyDataSet1Array = permute(noisyDataSet1Array, [2 1 3]);
+noisyDataSet2Array = permute(noisyDataSet2Array, [2 1 3]);
+
+groundTruthArray = groundTruthArray(:,:,end:-1:1);
+noisyDataSet1Array = noisyDataSet1Array(:,:,end:-1:1);
+noisyDataSet2Array = noisyDataSet2Array(:,:,end:-1:1);
 
 %%
+% invertir eje columnas/filas
+% dar vuelta en z
+
 niftiwrite(noisyDataSet1Array,'noisyDataSet1.nii')
-niftiwrite(noisyDataSet1Array,'noisyDataSet2.nii')
-niftiwrite(noisyDataSet1Array,'groundTruth.nii')
+niftiwrite(noisyDataSet2Array,'noisyDataSet2.nii')
+niftiwrite(groundTruthArray,'groundTruth.nii')
