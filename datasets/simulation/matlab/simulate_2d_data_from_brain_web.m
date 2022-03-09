@@ -562,14 +562,14 @@ for n = 1: size(pet_rescaled_all_images,2)
     end
 end
 
-for n = 1: size(groundTruth,2)
+for n = 1: size(groundTruthScaled,2)
     if n > 1
         posicion = posicion + size(noisyDataSet1{n-1},3);
     else
         posicion = 0;
     end
-    for i = 1: size(groundTruth{n},3)
-        array = groundTruth{n}(:,:,i);
+    for i = 1: size(groundTruthScaled{n},3)
+        array = groundTruthScaled{n}(:,:,i);
         groundTruthArray(:,:,i+posicion) = array;
     end
 end
@@ -587,7 +587,6 @@ noisyDataSet2Array = noisyDataSet2Array(:,:,end:-1:1);
 %%
 % invertir eje columnas/filas
 % dar vuelta en z
-
-niftiwrite(noisyDataSet1Array,'noisyDataSet1.nii')
+desniftiwrite(noisyDataSet1Array,'noisyDataSet1.nii')
 niftiwrite(noisyDataSet2Array,'noisyDataSet2.nii')
 niftiwrite(groundTruthArray,'groundTruth.nii')
