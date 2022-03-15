@@ -504,13 +504,13 @@ for n = 1: size(pet_rescaled_all_images,2)
     cantSlices = cantSlices + size(noisyDataSet1{n},3);
 end
 
-for n = 1: 1%size(pet_rescaled_all_images,2)
-    restaCuadrado{n}(:,:,:) = ((noisyDataSet1{n}(:,:,:) - groundTruth{n}(:,:,:)).^2);
+for n = 1: size(pet_rescaled_all_images,2)
+    restaCuadrado{n}(:,:,:) = ((noisyDataSet1{n}(:,:,:) - groundTruthScaled{n}(:,:,:)).^2);
 end
 
-sumTotal = 0;
+sumTotal = 0; 
 
-for n = 1: 1%size(pet_rescaled_all_images,2)
+for n = 1:size(pet_rescaled_all_images,2)
     array = restaCuadrado{n}(:,:,:);
     array(array == 0) = [];
     sumTotal = sumTotal + sum(array);
@@ -519,10 +519,11 @@ end
 cantVoxel = 344*344*cantSlices;
 mse_dataSet1 = sumTotal/cantVoxel
 
+
 %% MSE DATA SET 2
 
 for n = 1: size(pet_rescaled_all_images,2)
-    restaCuadrado{n}(:,:,:) = ((noisyDataSet1{n}(:,:,:) - groundTruth{n}(:,:,:)).^2);
+    restaCuadrado{n}(:,:,:) = ((noisyDataSet2{n}(:,:,:) - groundTruthScaled{n}(:,:,:)).^2);
 end
 
 sumTotal = 0;
@@ -535,7 +536,7 @@ for n = 1: size(pet_rescaled_all_images,2)
 end
 
 cantVoxel = 344*344*cantSlices;
-mse_dataSet1 = sumTotal/cantVoxel
+mse_dataSet2 = sumTotal/cantVoxel
 
 %% Guardar formato nifti
 for n = 1: size(pet_rescaled_all_images,2)
