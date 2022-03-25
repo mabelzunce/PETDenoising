@@ -15,7 +15,7 @@ from sklearn.model_selection import train_test_split
 from datetime import datetime
 
 from unet import Unet
-
+from utils import imshow
 import torch
 import torch.nn as nn
 import torchvision
@@ -83,15 +83,20 @@ transform = transforms.Compose([
 img_noisyDataSet1 =img_noisyDataSet1[30:50,:,:,:]
 img_noisyDataSet2 =img_noisyDataSet2[30:50,:,:,:]
 img_groundTruth =img_groundTruth[30:50,:,:,:]
+# Cast to float:
+img_noisyDataSet1 = img_noisyDataSet1.astype(np.float32)
+img_noisyDataSet2 = img_noisyDataSet2.astype(np.float32)
+img_groundTruth = img_groundTruth.astype(np.float32)
 
 # Create a UNET with one input and one output canal.
 unet = Unet(1,1)
-inp = torch.rand((1, 1, 256, 256))
+
+print(unet)
+inp = torch.rand(1, 1, 256, 256)
 out = unet(inp)
 
 ##
-print('Test Unet. Output shape:')
-out.shape
+print('Test Unet. Output shape:',out.shape)
 #tensorGroundTruth.shape
 
 # Loss and optimizer
@@ -99,14 +104,19 @@ out.shape
 criterion = nn.MSELoss()
 optimizer = optim.Adam(unet.parameters(), lr=0.0001)
 
+# Number of  batches:
+batchSize = 4
+numBatches = np.round(img_noisyDataSet1.shape[0]/batchSize).astype(int)
+# Show results every printStep batches:
+printStep = 1
 # Conjunto de entrenamiento, testeo y validacion
 for epoch in range(2):  # loop over the dataset multiple times
 
     running_loss = 0.0
-    for i in range(img_noisyDataSet1.shape[0]):
+    for i in range(numBatches):
         # get the inputs
-        inputs = transform(img_noisyDataSet1[i,:,:,:])
-        gt = transform(img_groundTruth[i,:,:,:])
+        inputs = torch.from_numpy(img_noisyDataSet1[i*batchSize:(i+1)*batchSize,:,:,:])
+        gt = torch.from_numpy(img_groundTruth[i*batchSize:(i+1)*batchSize,:,:,:])
 
         # zero the parameter gradients
         optimizer.zero_grad()
@@ -119,12 +129,17 @@ for epoch in range(2):  # loop over the dataset multiple times
 
         # print statistics
         running_loss += loss.item()
-        if i % 2000 == 1999:    # print every 2000 mini-batches
+        if i % printStep == (printStep-1):    # print every printStep mini-batches
             print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss / 2000))
+                  (epoch + 1, i + 1, running_loss))
             running_loss = 0.0
 
 print('Finished Training')
+
+# Show some results:
+scaleForVisualization = 1.2*img_groundTruth.max()
+imshow(torchvision.utils.make_grid(inputs), min=0, max=scaleForVisualization)
+
 
 
 
