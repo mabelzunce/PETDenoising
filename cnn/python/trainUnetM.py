@@ -17,7 +17,7 @@ from sklearn.model_selection import train_test_split
 from datetime import datetime
 
 import utils
-from unet import Unet
+from unetM import Unet
 
 
 unet = Unet()
@@ -72,6 +72,9 @@ optimizer = optim.Adam(unet.parameters(), lr=0.0001)
 # Codigo entrenamiento Martin
 
 # defino batches
+
+best_vloss = 1000000000
+
 batchSizeTrain = 4
 batchSizeValid = 4
 numBatchesTrain = np.round(trainingSet['input'].shape[0] / batchSizeTrain).astype(int)
