@@ -8,13 +8,13 @@ def imshow(img, min=0, max=1):
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)),vmin = min, vmax = max)
 
-def MSE(img1, img2, cantPix = None):
+def MSE(img1, img2, cantPixels = None):
     cuadradoDeDif = ((img1 - img2) ** 2)
     suma = np.sum(cuadradoDeDif)
-    if cantPix == 'None':
+    if cantPixels == None:
         cantPix = img1.shape[2] * img1.shape[1]  # img1 and 2 should have same shape
     else:
-        cantPix = cantPix
+        cantPix = cantPixels
     error = suma / cantPix
     return error
 
@@ -143,7 +143,45 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
 def reshapeDataSet(dataset):
 
+    "Reshape a TotalImagesx1x256x256"
+
     dataset = dataset[:, 44:300, 44:300]
     dataset = (np.expand_dims(dataset, axis=-3)).astype(np.float32)
 
     return dataset
+
+def torchToImg(dataTorch) :
+    "Pasamos de toch a imagen"
+    img = torch.unsqueeze(dataTorch, dim=0)
+    img = (img).detach().numpy()
+    return img
+
+def testModelSlice(model, inputsDataSet):
+
+    inputs = inputsDataSet
+    inputs = torch.unsqueeze(inputs, dim=0)
+    out = model(inputs)
+
+    return out
+
+def mseModelSlice(model, inputsDataSet, groundTruthDataSet, cantPixels = None):
+    '''Devuelve el MSE de una imagen
+    antes y dsp de pasar por el modelo'''
+
+    out = testModelSlice(model, inputsDataSet)
+
+    # Antes
+
+    img1 = torchToImg(inputsDataSet)
+    img2 = torchToImg(groundTruthDataSet)
+
+    mseAntes = (MSE(img1[0, :, :], img2[0, :, :],cantPixels))
+
+    # Dsp
+    imgOut = (out).detach().numpy()
+    mseDespues = (MSE(imgOut[0, :, :], img2[0, :, :],cantPixels))
+
+    return mseAntes, mseDespues
+
+def obtenerMask(img, num_mask) :
+    return ((img == num_mask) * 1.0)
