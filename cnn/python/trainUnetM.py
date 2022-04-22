@@ -1,4 +1,5 @@
 import nibabel as nb
+import pandas as pd
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
 import numpy
@@ -65,6 +66,5 @@ criterion = nn.MSELoss()
 optimizer = optim.Adam(unet.parameters(), lr=0.0001)
 
 
-lossValuesTraining,setlossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer,4,1)
-
+lossValuesTraining,setlossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer,4,20)
 
