@@ -1,12 +1,45 @@
 import torch
+import torchvision
 import numpy as np
 import matplotlib.pyplot as plt
 from datetime import datetime
 
+import SimpleITK as sitk
+
 def imshow(img, min=0, max=1):
-    #img = img / 2 + 0.5     # unnormalize
+    img = img / 2 + 0.5     # unnormalize
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)),vmin = min, vmax = max)
+    return
+
+def showGridImg(inputs,outputs,gt,saveImg = 'False'):
+    figImages, axs = plt.subplots(3, 1, figsize=(20, 20))
+    vmin = gt.min()
+    vmax = gt.max()
+    #Show input images:
+    plt.figure(figImages)
+    plt.axes(axs[0])
+    imshow(torchvision.utils.make_grid(inputs),vmin,vmax)
+    axs[0].set_title('Input')
+    plt.axes(axs[1])
+    imshow(torchvision.utils.make_grid(outputs, normalize=True),vmin,vmax)
+    axs[1].set_title('Output')
+    plt.axes(axs[2])
+    imshow(torchvision.utils.make_grid(gt, normalize=True),vmin,vmax)
+    axs[2].set_title('Ground Truth')
+    plt.savefig('gridImages.png')
+    plt.show(block=False)
+    if saveImg == 'True' :
+        inputNp = torchToNp(inputs)
+        saveNumpyAsNii(inputNp,'input.nii')
+
+        outNp = torchToNp(outputs)
+        saveNumpyAsNii(outNp, 'out.nii')
+
+        gtNp = torchToNp(gt)
+        saveNumpyAsNii(gtNp, 'gt.nii')
+
+    return
 
 def MSE(img1, img2, cantPixels = None):
     cuadradoDeDif = ((img1 - img2) ** 2)
@@ -18,7 +51,7 @@ def MSE(img1, img2, cantPixels = None):
     error = suma / cantPix
     return error
 
-def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, pre_trained=False):
+def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, pre_trained = False):
     # defino batches
 
     best_vloss = 1000000000
@@ -26,7 +59,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     batchSizeTrain = num_batch
     batchSizeValid = num_batch
     numBatchesTrain = np.round(trainSet['input'].shape[0] / batchSizeTrain).astype(int)
-    numBatchesValid = np.round(trainSet['input'].shape[0] / batchSizeValid).astype(int)
+    numBatchesValid = np.round(validSet['input'].shape[0] / batchSizeValid).astype(int)
 
     # Show dev set loss every showDevLossStep batches:
     showDevLossStep = 4
@@ -126,7 +159,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
             lossValuesDevSetEpoch.append(vloss.item())
 
-        avg_vloss = np.mean(lossValuesDevSet)
+        avg_vloss = np.mean(lossValuesDevSetEpoch)
         lossValuesDevSetAllEpoch.append(np.mean(lossValuesDevSetEpoch))
 
         if avg_vloss < best_vloss:
@@ -150,7 +183,7 @@ def reshapeDataSet(dataset):
 
     return dataset
 
-def torchToImg(dataTorch) :
+def torchToNp(dataTorch) :
     "Pasamos de toch a imagen"
     img = torch.unsqueeze(dataTorch, dim=0)
     img = (img).detach().numpy()
@@ -164,24 +197,30 @@ def testModelSlice(model, inputsDataSet):
 
     return out
 
-def mseModelSlice(model, inputsDataSet, groundTruthDataSet, cantPixels = None):
+def mseAntDspModelTorchSlice(inputs,outputs, groundTruth, cantPixels = None):
     '''Devuelve el MSE de una imagen
     antes y dsp de pasar por el modelo'''
 
-    out = testModelSlice(model, inputsDataSet)
-
     # Antes
 
-    img1 = torchToImg(inputsDataSet)
-    img2 = torchToImg(groundTruthDataSet)
+    img1 = torchToNp(inputs)
+    img2 = torchToNp(groundTruth)
 
     mseAntes = (MSE(img1[0, :, :], img2[0, :, :],cantPixels))
 
     # Dsp
-    imgOut = (out).detach().numpy()
-    mseDespues = (MSE(imgOut[0, :, :], img2[0, :, :],cantPixels))
+    img3 = torchToNp(outputs)
+    mseDespues = (MSE(img3[0, :, :], img2[0, :, :],cantPixels))
 
     return mseAntes, mseDespues
 
 def obtenerMask(img, num_mask) :
     return ((img == num_mask) * 1.0)
+
+def saveNumpyAsNii(np_img,name):
+    '''Recibe numpy array de 4 dimensiones
+    y la guarda en formato .Nii'''
+    image = sitk.GetImageFromArray(np_img[0, :, :])
+    img_name = name + '.nii'
+    sitk.WriteImage(image, img_name)
+    return
