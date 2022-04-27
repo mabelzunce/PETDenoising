@@ -2,14 +2,16 @@
 
 import torch
 import torchvision
-from unetM import Unet
 
+from unetM import Unet
+from utils import imshow
 from utils import reshapeDataSet
 from utils import MSE
-from utils import torchToImg
-from utils import mseModelSlice
+from utils import torchToNp
+from utils import mseAntDspModelTorchSlice
 from utils import testModelSlice
 from utils import obtenerMask
+from utils import showGridImg
 
 import SimpleITK as sitk
 import numpy as np
@@ -49,25 +51,27 @@ groundTruthTestSet1 = torch.from_numpy(trainingSet1['output'][:,:,:,:])
 inputsTestSet1 = torchvision.transforms.functional.rotate(inputsTestSet1,15)
 groundTruthTestSet1 = torchvision.transforms.functional.rotate(groundTruthTestSet1,15)
 
-out = testModelSlice(modelDT1, inputsTestSet1[9])
-out = (out).detach().numpy()
-out = sitk.GetImageFromArray(out[0,:,:])
-sitk.WriteImage(out,'out.nii')
+outModel = testModelSlice(modelDT1, inputsTestSet1[30])
 
-mseBef, mseAft = mseModelSlice(modelDT1,inputsTestSet1[9],groundTruthTestSet1[9])
+mseBef, mseAft = mseAntDspModelTorchSlice(inputsTestSet1[30],outModel[0,:,:,:],groundTruthTestSet1[30])
 
 print('DATA SET 1 ROTADO')
 print('MSE antes de pasar por la red', mseBef)
 print('MSE dsp de pasar por la red', mseAft)
 
+showGridImg(inputsTestSet1[30:34,:,:,:],outModel[0,:,:,:],groundTruthTestSet1[30], saveImg = 'True')
+
 ######################## Testeo data set 2 ###############################
 
 trainingSet2 = dict([('input',img_noisyDataSet2), ('output', img_groundTruth)])
 
+
 inputsTestSet2 = torch.from_numpy(trainingSet2['input'][:,:,:,:])
 groundTruthTestSet2 = torch.from_numpy(trainingSet2['output'][:,:,:,:])
 
-mseBef, mseAft = mseModelSlice(modelDT1,inputsTestSet2[30],groundTruthTestSet2[30])
+outModel = testModelSlice(modelDT1,inputsTestSet2[30])
+
+mseBef, mseAft = mseAntDspModelTorchSlice(inputsTestSet2[30],outModel[0,:,:,:],groundTruthTestSet2[30])
 
 print('DATA SET 2')
 print('MSE antes de pasar por la red', mseBef)
@@ -88,9 +92,11 @@ whiteMaskMatterDataSet1 = obtenerMask(groundTruthTestSet1[nroSliceDS1],whiteMatt
 greyMatterNoisyDataSet1Antes = inputsTestSet1[nroSliceDS1] * greyMaskMatterDataSet1
 greyMatterNoisyDataSet1Dsp = noisyOutDataSet1 * greyMaskMatterDataSet1
 
+groundTruthGreyMatterNoisyDataSet1 = groundTruthTestSet1[nroSliceDS1] * greyMaskMatterDataSet1
+
 cantPix = np.count_nonzero(greyMaskMatterDataSet1)
 
-mseBef, mseAft = mseModelSlice(modelDT1,greyMatterNoisyDataSet1Antes,greyMatterNoisyDataSet1Dsp,cantPix)
+mseBef, mseAft = mseAntDspModelTorchSlice(greyMatterNoisyDataSet1Antes,greyMatterNoisyDataSet1Dsp,groundTruthGreyMatterNoisyDataSet1, cantPix)
 
 print('DATA SET 1 MATERIA GRIS')
 print('MSE antes de pasar por la red', mseBef)
@@ -101,7 +107,9 @@ whiteMatterNoisyDataSet1Dsp = noisyOutDataSet1 * whiteMaskMatterDataSet1
 
 cantPix = np.count_nonzero(whiteMaskMatterDataSet1)
 
-mseBef, mseAft = mseModelSlice(modelDT1,whiteMatterNoisyDataSet1Antes,whiteMatterNoisyDataSet1Dsp,cantPix)
+groundTruthWhiteMatterNoisyDataSet1 = groundTruthTestSet1[nroSliceDS1] * whiteMaskMatterDataSet1
+
+mseBef, mseAft = mseAntDspModelTorchSlice(whiteMatterNoisyDataSet1Antes,whiteMatterNoisyDataSet1Dsp,groundTruthWhiteMatterNoisyDataSet1,cantPix)
 
 print('DATA SET 1 MATERIA BLANCA')
 print('MSE antes de pasar por la red', mseBef)
@@ -130,7 +138,10 @@ greyMatterNoisyDataSet2Dsp = noisyOutDataSet2 * greyMaskMatterDataSet2
 
 cantPix = np.count_nonzero(greyMaskMatterDataSet2)
 
-mseBef, mseAft = mseModelSlice(modelDT1,greyMatterNoisyDataSet2Antes,greyMatterNoisyDataSet2Dsp,cantPix)
+groundTruthGreyMatterNoisyDataSet2 = groundTruthTestSet2[nroSliceDS2] * greyMaskMatterDataSet2
+
+mseBef, mseAft = mseAntDspModelTorchSlice(greyMatterNoisyDataSet2Antes,greyMatterNoisyDataSet2Dsp,groundTruthGreyMatterNoisyDataSet2,cantPix)
+
 
 print('DATA SET 2 MATERIA GRIS')
 print('MSE antes de pasar por la red', mseBef)
@@ -141,7 +152,9 @@ whiteMatterNoisyDataSet2Dsp = noisyOutDataSet2 * whiteMaskMatterDataSet2
 
 cantPix = np.count_nonzero(whiteMaskMatterDataSet2)
 
-mseBef, mseAft = mseModelSlice(modelDT1,whiteMatterNoisyDataSet2Antes,whiteMatterNoisyDataSet2Dsp,cantPix)
+groundTruthWhiteMatterNoisyDataSet2 = groundTruthTestSet2[nroSliceDS2] * whiteMaskMatterDataSet2
+
+mseBef, mseAft = mseAntDspModelTorchSlice(whiteMatterNoisyDataSet2Antes,whiteMatterNoisyDataSet2Dsp,groundTruthWhiteMatterNoisyDataSet2,cantPix)
 
 
 noisyOutDataSet2 = (noisyOutDataSet2).detach().numpy()
@@ -170,12 +183,9 @@ groundTruthTestSet1 = torch.from_numpy(trainingSet1['output'][:,:,:,:])
 inputsTestSet1 = torchvision.transforms.functional.rotate(inputsTestSet1,15)
 groundTruthTestSet1 = torchvision.transforms.functional.rotate(groundTruthTestSet1,15)
 
-out = testModelSlice(modelDT2, inputsTestSet1[9])
-out = (out).detach().numpy()
-out = sitk.GetImageFromArray(out[0,:,:])
-sitk.WriteImage(out,'outModel2.nii')
+outModel = testModelSlice(modelDT2, inputsTestSet1[9])
 
-mseBef, mseAft = mseModelSlice(modelDT2,inputsTestSet1[9],groundTruthTestSet1[9])
+mseBef, mseAft = mseAntDspModelTorchSlice(inputsTestSet1[9],outModel[0,:,:,:],groundTruthTestSet1[9])
 
 print('DATA SET 2 ROTADO')
 print('MSE antes de pasar por la red', mseBef)
@@ -188,7 +198,9 @@ trainingSet2 = dict([('input',img_noisyDataSet1), ('output', img_groundTruth)])
 inputsTestSet2 = torch.from_numpy(trainingSet2['input'][:,:,:,:])
 groundTruthTestSet2 = torch.from_numpy(trainingSet2['output'][:,:,:,:])
 
-mseBef, mseAft = mseModelSlice(modelDT2,inputsTestSet2[30],groundTruthTestSet2[30])
+outModel = testModelSlice(modelDT2, inputsTestSet2[30])
+
+mseBef, mseAft = mseAntDspModelTorchSlice(inputsTestSet2[30],outModel[0,:,:,:],groundTruthTestSet2[30])
 
 print('DATA SET 1')
 print('MSE antes de pasar por la red', mseBef)
@@ -209,7 +221,10 @@ greyMatterNoisyDataSet2Dsp = noisyOutDataSet2 * greyMaskMatterDataSet2
 
 cantPix = np.count_nonzero(greyMaskMatterDataSet2)
 
-mseBef, mseAft = mseModelSlice(modelDT2,greyMatterNoisyDataSet2Antes,greyMatterNoisyDataSet2Dsp,cantPix)
+groundTruthGreyMatterNoisyDataSet2 = groundTruthTestSet2[nroSliceDS2] * greyMaskMatterDataSet2
+
+mseBef, mseAft = mseAntDspModelTorchSlice(greyMatterNoisyDataSet2Antes,greyMatterNoisyDataSet2Dsp,groundTruthGreyMatterNoisyDataSet2,cantPix)
+
 
 print('DATA SET 1 MATERIA GRIS')
 print('MSE antes de pasar por la red', mseBef)
@@ -220,14 +235,9 @@ whiteMatterNoisyDataSet2Dsp = noisyOutDataSet2 * whiteMaskMatterDataSet2
 
 cantPix = np.count_nonzero(whiteMaskMatterDataSet2)
 
-mseBef, mseAft = mseModelSlice(modelDT2,whiteMatterNoisyDataSet2Antes,whiteMatterNoisyDataSet2Dsp,cantPix)
+groundTruthWhiteMatterNoisyDataSet2 = groundTruthTestSet2[nroSliceDS2] * whiteMaskMatterDataSet2
 
-noisyOutDataSet2 = (noisyOutDataSet2).detach().numpy()
-outModel1DataSet2 = sitk.GetImageFromArray(noisyOutDataSet2[0,:,:])
-sitk.WriteImage(outModel1DataSet2,'outModel2DataSet1.nii')
-
-maskWhiteModel1DataSet2 = sitk.GetImageFromArray(whiteMaskMatterDataSet2[0,:,:])
-sitk.WriteImage(maskWhiteModel1DataSet2,'maskWhiteModel2DataSet1.nii')
+mseBef, mseAft = mseAntDspModelTorchSlice(whiteMatterNoisyDataSet2Antes,whiteMatterNoisyDataSet2Dsp,groundTruthWhiteMatterNoisyDataSet2,cantPix)
 
 print('DATA SET 1 MATERIA BLANCA')
 print('MSE antes de pasar por la red', mseBef)
@@ -250,7 +260,9 @@ greyMatterNoisyDataSet1Dsp = noisyOutDataSet1 * greyMaskMatterDataSet1
 
 cantPix = np.count_nonzero(greyMaskMatterDataSet1)
 
-mseBef, mseAft = mseModelSlice(modelDT2,greyMatterNoisyDataSet1Antes,greyMatterNoisyDataSet1Dsp,cantPix)
+groundTruthGreyMatterNoisyDataSet1 = groundTruthTestSet1[nroSliceDS1] * greyMaskMatterDataSet1
+
+mseBef, mseAft = mseAntDspModelTorchSlice(greyMatterNoisyDataSet1Antes,greyMatterNoisyDataSet1Dsp,groundTruthGreyMatterNoisyDataSet1,cantPix)
 
 print('DATA SET 2 MATERIA GRIS')
 print('MSE antes de pasar por la red', mseBef)
@@ -261,17 +273,10 @@ whiteMatterNoisyDataSet1Dsp = noisyOutDataSet1 * whiteMaskMatterDataSet1
 
 cantPix = np.count_nonzero(whiteMaskMatterDataSet1)
 
-mseBef, mseAft = mseModelSlice(modelDT2,whiteMatterNoisyDataSet1Antes,whiteMatterNoisyDataSet1Dsp,cantPix)
+groundTruthWhiteMatterNoisyDataSet1 = groundTruthTestSet1[nroSliceDS1] * whiteMaskMatterDataSet1
+
+mseBef, mseAft = mseAntDspModelTorchSlice(whiteMatterNoisyDataSet1Antes,whiteMatterNoisyDataSet1Dsp,groundTruthWhiteMatterNoisyDataSet1,cantPix)
 
 print('DATA SET 2 MATERIA BLANCA')
 print('MSE antes de pasar por la red', mseBef)
 print('MSE dsp de pasar por la red', mseAft)
-
-
-noisyOutDataSet1= (noisyOutDataSet1).detach().numpy()
-outModel1DataSet1 = sitk.GetImageFromArray(noisyOutDataSet1[0,:,:])
-sitk.WriteImage(outModel1DataSet1,'outModel2DataSet2.nii')
-
-
-maskWhiteModel1DataSet1 = sitk.GetImageFromArray(whiteMaskMatterDataSet1[0,:,:])
-sitk.WriteImage(maskWhiteModel1DataSet1,'maskWhiteModel2DataSet2.nii')
