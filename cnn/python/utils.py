@@ -1,10 +1,10 @@
 import torch
 import torchvision
 import numpy as np
-import matplotlib.pyplot as plt
-from datetime import datetime
-
 import SimpleITK as sitk
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
+from datetime import datetime
 
 def imshow(img, min=0, max=1):
     img = img / 2 + 0.5     # unnormalize
@@ -12,34 +12,29 @@ def imshow(img, min=0, max=1):
     plt.imshow(np.transpose(npimg, (1, 2, 0)),vmin = min, vmax = max)
     return
 
-def showGridImg(inputs,outputs,gt,saveImg = 'False'):
-    figImages, axs = plt.subplots(3, 1, figsize=(20, 20))
-    vmin = gt.min()
-    vmax = gt.max()
-    #Show input images:
-    plt.figure(figImages)
-    plt.axes(axs[0])
-    imshow(torchvision.utils.make_grid(inputs),vmin,vmax)
-    axs[0].set_title('Input')
-    plt.axes(axs[1])
-    imshow(torchvision.utils.make_grid(outputs, normalize=True),vmin,vmax)
-    axs[1].set_title('Output')
-    plt.axes(axs[2])
-    imshow(torchvision.utils.make_grid(gt, normalize=True),vmin,vmax)
-    axs[2].set_title('Ground Truth')
-    plt.savefig('gridImages.png')
+def showGridNumpyImg(inputs, outputs, gt, plotTitle,saveImg='False'):
+    vmin = gt[0].min()
+    vmax = gt[0].max()
+
+    cantImg = len(inputs)
+
+    totalImg = [inputs + outputs + gt]
+
+    fig = plt.figure(figsize=(4, 4))
+    grid = ImageGrid(fig, 111,  # similar to subplot(111)
+                     nrows_ncols=(3, cantImg),
+                     axes_pad=0.1,
+                     )
+
+    for ax, im in zip(grid, totalImg[0]):
+        img = np.transpose(im[0,:,:,:], (1, 2, 0))
+        ax.imshow(img, vmin = vmin, vmax = vmax)
+
+    plt.title(plotTitle)
     plt.show(block=False)
-    if saveImg == 'True' :
-        inputNp = torchToNp(inputs)
-        saveNumpyAsNii(inputNp,'input.nii')
-
-        outNp = torchToNp(outputs)
-        saveNumpyAsNii(outNp, 'out.nii')
-
-        gtNp = torchToNp(gt)
-        saveNumpyAsNii(gtNp, 'gt.nii')
-
+    plt.savefig('gridImages.png')
     return
+
 
 def MSE(img1, img2, cantPixels = None):
     cuadradoDeDif = ((img1 - img2) ** 2)
