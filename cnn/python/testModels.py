@@ -1,4 +1,4 @@
-# Cargamos los modelos y visualizamos resultados
+# Cargamos los modelos y visualizamos resultados con dataSet #
 
 import torch
 import torchvision
@@ -11,17 +11,19 @@ from utils import torchToNp
 from utils import mseAntDspModelTorchSlice
 from utils import testModelSlice
 from utils import obtenerMask
-from utils import showGridImg
+from utils import showGridNumpyImg
+from utils import saveNumpyAsNii
 
 import SimpleITK as sitk
 import numpy as np
 from sklearn.model_selection import train_test_split
 
+
 modelDT1 = Unet()
-modelDT1.load_state_dict(torch.load('bestModelDataSet1_35'))
+modelDT1.load_state_dict(torch.load('bestModelDataSet1_24'))
 
 modelDT2 = Unet()
-modelDT2.load_state_dict(torch.load('bestModelDataSet2_7'))
+modelDT2.load_state_dict(torch.load('bestModelDataSet2_17'))
 
 noisyDataSet1_nii = sitk.ReadImage('./noisyDataSet1.nii')
 img_noisyDataSet1 = sitk.GetArrayFromImage(noisyDataSet1_nii)
@@ -59,7 +61,7 @@ print('DATA SET 1 ROTADO')
 print('MSE antes de pasar por la red', mseBef)
 print('MSE dsp de pasar por la red', mseAft)
 
-showGridImg(inputsTestSet1[30:34,:,:,:],outModel[0,:,:,:],groundTruthTestSet1[30], saveImg = 'True')
+# showGridImg(inputsTestSet1[30:34,:,:,:],outModel[0,:,:,:],groundTruthTestSet1[30], saveImg = 'True')
 
 ######################## Testeo data set 2 ###############################
 
@@ -73,9 +75,31 @@ outModel = testModelSlice(modelDT1,inputsTestSet2[30])
 
 mseBef, mseAft = mseAntDspModelTorchSlice(inputsTestSet2[30],outModel[0,:,:,:],groundTruthTestSet2[30])
 
+
 print('DATA SET 2')
 print('MSE antes de pasar por la red', mseBef)
 print('MSE dsp de pasar por la red', mseAft)
+
+## PRUEBA 1 ##
+
+cantImg = 3
+cantIdx = (inputsTestSet2.shape[0])
+ramdomIdx = np.random.randint(0, cantIdx, cantImg).tolist()
+
+inputsTestSet2Np = []
+outMode2Np = []
+groundTruthTestSet2Np = []
+
+for idx in ramdomIdx :
+    inputsTestSet2Np.append(torchToNp(inputsTestSet2[idx]))
+    outModel = testModelSlice(modelDT1,inputsTestSet2[idx])
+    outModel = torchToNp(outModel)
+    outMode2Np.append(outModel[0,:,:,:])
+    groundTruthTestSet2Np.append(torchToNp(groundTruthTestSet2[idx]))
+
+showGridNumpyImg(inputsTestSet2Np,outMode2Np,groundTruthTestSet2Np, plotTitle = 'Modelo1 + DATASET2' ,saveImg = 'False')
+
+
 
 ######################## Testeo MATERIA GRIS y BLANCA DT1 ##############################
 
@@ -205,6 +229,24 @@ mseBef, mseAft = mseAntDspModelTorchSlice(inputsTestSet2[30],outModel[0,:,:,:],g
 print('DATA SET 1')
 print('MSE antes de pasar por la red', mseBef)
 print('MSE dsp de pasar por la red', mseAft)
+
+
+cantImg = 3
+cantIdx = (inputsTestSet2.shape[0])
+ramdomIdx = np.random.randint(0, cantIdx, cantImg).tolist()
+
+inputsTestSet2Np = []
+outMode2Np = []
+groundTruthTestSet2Np = []
+
+for idx in ramdomIdx :
+    inputsTestSet2Np.append(torchToNp(inputsTestSet2[idx]))
+    outModel = testModelSlice(modelDT2,inputsTestSet2[idx])
+    outModel = torchToNp(outModel)
+    outMode2Np.append(outModel[0,:,:,:])
+    groundTruthTestSet2Np.append(torchToNp(groundTruthTestSet2[idx]))
+
+showGridNumpyImg(inputsTestSet2Np,outMode2Np,groundTruthTestSet2Np, plotTitle = 'Modelo2 + DATASET1' ,saveImg = 'False')
 
 
 ######################## Testeo MATERIA GRIS y BLANCA DT1 ##############################
