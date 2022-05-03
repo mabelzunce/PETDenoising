@@ -12,7 +12,7 @@ def imshow(img, min=0, max=1):
     plt.imshow(np.transpose(npimg, (1, 2, 0)),vmin = min, vmax = max)
     return
 
-def showGridNumpyImg(inputs, outputs, gt, plotTitle,saveImg='False'):
+def showGridNumpyImg(inputs, outputs, gt, plotTitle):
     vmin = gt[0].min()
     vmax = gt[0].max()
 
@@ -26,15 +26,24 @@ def showGridNumpyImg(inputs, outputs, gt, plotTitle,saveImg='False'):
                      axes_pad=0.1,
                      )
 
+    labels = ['Input', 'Output', 'Ground Truth']
+
+    i = 0
+    cont = 0
     for ax, im in zip(grid, totalImg[0]):
         img = np.transpose(im[0,:,:,:], (1, 2, 0))
         ax.imshow(img, vmin = vmin, vmax = vmax)
+        if (i == 0) or (i%cantImg) == 0:
+            ax.set_ylabel(labels[cont])
+            cont = cont + 1
+        i = i + 1
 
-    plt.title(plotTitle)
+    grid.axes_all[1].set_title(plotTitle)
     plt.show(block=False)
-    plt.savefig('gridImages.png')
-    return
+    name = plotTitle+'.png'
+    plt.savefig(name)
 
+    return
 
 def MSE(img1, img2, cantPixels = None):
     cuadradoDeDif = ((img1 - img2) ** 2)
@@ -219,3 +228,69 @@ def saveNumpyAsNii(np_img,name):
     img_name = name + '.nii'
     sitk.WriteImage(image, img_name)
     return
+
+
+def getTestOneModelOneSlices(model, inputs, groundTruth, display = 'False' ,mse='False', mseGrey='False', greyMatterValue=None,
+                             mseWhite='False', whiteMatterValue=None):
+    '''Para usar esta funcion inputs y
+    grounTruth deben ser Tensores
+    inputs es solo un slice'''
+
+    model = model
+    outModel = testModelSlice(model, inputs)
+
+    if mse == 'True':
+        mseBef, mseAft = mseAntDspModelTorchSlice(inputs, outModel[0, :, :, :], groundTruth)
+        if display == 'True':
+            print('MSE:')
+            print('MSE antes de pasar por la red', mseBef)
+            print('MSE dsp de pasar por la red', mseAft)
+
+        return outModel, mseBef, mseAft
+
+    if mseGrey == 'True':
+        greyMatterValue = greyMatterValue
+
+        greyMaskMatter = obtenerMask(groundTruth, greyMatterValue)
+
+        greyMatterNoisyAntes = inputs * greyMaskMatter
+        greyMatterNoisyDsp = outModel * greyMaskMatter
+
+        groundTruthGreyMatter = groundTruth * greyMaskMatter
+        cantPix = np.count_nonzero(groundTruthGreyMatter)
+
+        mseBefGrey, mseAftGrey = mseAntDspModelTorchSlice(greyMatterNoisyAntes, greyMatterNoisyDsp,
+                                                          groundTruthGreyMatter, cantPix)
+        if display == 'True':
+            print('MATERIA GRIS')
+            print('MSE antes de pasar por la red', mseBefGrey)
+            print('MSE dsp de pasar por la red', mseAftGrey)
+
+        return outModel, mseBefGrey, mseAftGrey
+
+    if mseWhite == 'True':
+        whiteMatterValue = whiteMatterValue
+
+        whiteMaskMatter = obtenerMask(groundTruth, whiteMatterValue)
+
+        whiteMatterNoisyAntes = inputs * whiteMaskMatter
+        whiteMatterNoisyDsp = outModel * whiteMaskMatter
+
+        cantPix = np.count_nonzero(whiteMaskMatter)
+
+        groundTruthWhiteMatterNoisy = groundTruth * whiteMaskMatter
+
+        mseBefWhite, mseAftWhite = mseAntDspModelTorchSlice(whiteMatterNoisyAntes, whiteMatterNoisyDsp,
+
+                                                            groundTruthWhiteMatterNoisy, cantPix)
+
+        if display == 'True':
+            print('MATERIA BLANCA')
+            print('MSE antes de pasar por la red', mseBefWhite)
+            print('MSE dsp de pasar por la red', mseAftWhite)
+
+        return outModel, mseBefWhite, mseAftWhite
+
+    else:
+
+        return outModel
