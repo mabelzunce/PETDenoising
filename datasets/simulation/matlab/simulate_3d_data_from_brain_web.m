@@ -16,24 +16,23 @@ else
 end
 %% CONFIGURE PATHS
 % APIRL PATH
-apirlPath = 'C:\Users\Encargado\Milagros\apirl-code\';
+apirlPath = 'D:\Martin\apirl-code\';
 addpath(genpath([apirlPath pathBar 'matlab']));
 setenv('PATH', [getenv('PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
 setenv('LD_LIBRARY_PATH', [getenv('LD_LIBRARY_PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
 %% INIT CLASS GPET
 
-PET.scanner = 'cylindrical';
-PET.method =  'otf_siddon_cpu';
-PET.PSF.type = 'none';
-PET.radialBinTrim = 0;
-PET.Geom = '';
+PET.scanner = 'mMR';
+PET.method =  'otf_siddon_gpu';
 PET.random_algorithm = 'from_ML_singles_matlab';
+objGpet.PSF.type = 'shift-invar';
+objGpet.PSF.Width = 2.5; %mm
 PET = classGpet(PET);
 
 %% BRAIN WEB IMAGES
 % se cargan y se generan los fantomas
 
-brainWebPath = 'C:\Users\Encargado\Milagros\BrainWEB\'
+brainWebPath = 'D:\UNSAM\PET\BrainWEB\'
 imgDir = dir ([brainWebPath])
 
 
@@ -63,9 +62,10 @@ PET.init_image_properties(refImage_all_images{1});
 param.nSubsets = 1;
 param.sinogram_size.span = 11;    % Span 0 is multi slice 2d.
 % param.sinogram_size.nRings = 3; % for span 1, 1 ring.
-param.image_size.matrixSize = [refImage_all_images{1}.ImageSize(1:2) 1];
+%param.image_size.matrixSize = [refImage_all_images{1}.ImageSize(1:2) 1];
 PET.Revise(param);
-
+% structSizeSino3d = getSizeSino3dFromSpan(PET.sinogram_size.nRadialBins, PET.sinogram_size.nAnglesBins, PET.sinogram_size.Rings, 0, ...
+%     0, PET.sinogram_size.span, PET.sinogram_size.maxRingDiffs);
 %% 
 
 for n = 1: size(pet_rescaled_all_images,2) 
@@ -111,6 +111,11 @@ for n = 1: size(pet_rescaled_all_images,2)
     sensImage = PET.Sensitivity(af);
     recon = PET.ones();
     noisyDataSet2d{n} = PET.OPOSEM(simulatedSinogram,s+r, sensImage,recon, ceil(60/PET.nSubsets));
+    noisyDataSet2d{n} = permute(noisyDataSet2d{n}, [2 1 3]);
+    noisyDataSet2d{n} = noisyDataSet2d{n}(:,:,end:-1:1);
+
+    %%
+    niftiwrite(noisyDataSet2d{n},sprintf('noisyDataSet_Subject%d.nii', n))
 end
 %% Analisis Slice 43 , DATA SET 1 y DATA SET 2
 
@@ -408,6 +413,6 @@ noisyDataSet2Array = noisyDataSet2Array(:,:,end:-1:1);
 %%
 % invertir eje columnas/filas
 % dar vuelta en z
-desniftiwrite(noisyDataSet1Array,'noisyDataSet1.nii')
+niftiwrite(noisyDataSet1Array,'noisyDataSet1.nii')
 niftiwrite(noisyDataSet2Array,'noisyDataSet2.nii')
 niftiwrite(groundTruthArray,'groundTruth.nii')
