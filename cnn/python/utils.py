@@ -7,7 +7,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from datetime import datetime
 
 def imshow(img, min=0, max=1):
-    img = img / 2 + 0.5     # unnormalize
+    img = img
     npimg = img.numpy()
     plt.imshow(np.transpose(npimg, (1, 2, 0)),vmin = min, vmax = max)
     return
@@ -230,14 +230,8 @@ def saveNumpyAsNii(np_img,name):
     return
 
 
-def getTestOneModelOneSlices(model, inputs, groundTruth, display = 'False' ,mse='False', mseGrey='False', greyMatterValue=None,
-                             mseWhite='False', whiteMatterValue=None):
-    '''Para usar esta funcion inputs y
-    grounTruth deben ser Tensores
-    inputs es solo un slice'''
-
-    model = model
-    outModel = testModelSlice(model, inputs)
+def getTestOneModelOneSlices(inputs, outModel,groundTruth, display = 'False' ,mse='False', mseGrey='False', maskGrey = None, greyMatterValue=None,
+                             mseWhite='False', maskWhite= None, whiteMatterValue=None):
 
     if mse == 'True':
         mseBef, mseAft = mseAntDspModelTorchSlice(inputs, outModel[0, :, :, :], groundTruth)
@@ -251,7 +245,10 @@ def getTestOneModelOneSlices(model, inputs, groundTruth, display = 'False' ,mse=
     if mseGrey == 'True':
         greyMatterValue = greyMatterValue
 
-        greyMaskMatter = obtenerMask(groundTruth, greyMatterValue)
+        if maskGrey == None:
+            greyMaskMatter = obtenerMask(groundTruth, greyMatterValue)
+        else:
+            greyMaskMatter = maskGrey
 
         greyMatterNoisyAntes = inputs * greyMaskMatter
         greyMatterNoisyDsp = outModel * greyMaskMatter
@@ -271,7 +268,10 @@ def getTestOneModelOneSlices(model, inputs, groundTruth, display = 'False' ,mse=
     if mseWhite == 'True':
         whiteMatterValue = whiteMatterValue
 
-        whiteMaskMatter = obtenerMask(groundTruth, whiteMatterValue)
+        if maskWhite == None :
+            whiteMaskMatter = obtenerMask(groundTruth, whiteMatterValue)
+        else:
+            whiteMaskMatter = maskWhite
 
         whiteMatterNoisyAntes = inputs * whiteMaskMatter
         whiteMatterNoisyDsp = outModel * whiteMaskMatter
@@ -294,3 +294,36 @@ def getTestOneModelOneSlices(model, inputs, groundTruth, display = 'False' ,mse=
     else:
 
         return outModel
+
+def covValue(img, maskGrey):
+    '''
+    Se calcula a partir del std y mean en materia gris
+    '''
+    materiaGris = img * maskGrey
+
+    materiaGris = np.trim_zeros((torchToNp(materiaGris)).flatten())
+
+    meanMateriaGris = np.mean(materiaGris)
+    stdMateriaGris = np.std(materiaGris)
+
+    cov= stdMateriaGris / meanMateriaGris
+
+    return cov
+
+def crcValue(img, maskGrey, maskWhite):
+    '''
+    mean materia gris/ mean materia blanca
+    '''
+
+    materiaBlanca = maskWhite * img
+    materiaGris = maskGrey * img
+
+    materiaGris = np.trim_zeros((torchToNp(materiaGris)).flatten())
+    materiaBlanca = np.trim_zeros((torchToNp(materiaBlanca)).flatten())
+
+    meanMateriaGris = np.mean(materiaGris)
+    meanMateriaBlanca = np.mean(materiaBlanca)
+
+    crc = meanMateriaGris / meanMateriaBlanca
+
+    return crc
