@@ -168,7 +168,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = 'modelDataSet2_{}_{}'.format(timestamp, epoch)
+            model_path = 'modelDataSet3_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
         print('LOSS train {} valid {}'.format(lossValuesEpoch[-1], lossValuesDevSetAllEpoch[-1]))
