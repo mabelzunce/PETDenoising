@@ -18,7 +18,7 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from utils import trainModel
 from utils import reshapeDataSet
-from utils import showSubplots, plot_weights
+from utils import showSubplots
 from unetM import Unet
 import unetM
 
@@ -67,7 +67,7 @@ noisyImagesArray = torch.from_numpy(noisyImagesArray)
 groundTruthArray = torch.from_numpy(groundTruthArray)
 
 subject = 5
-sliceNro = 1
+sliceNro = 80
 
 def get_activation(name):
     def hook(model, input, output):
@@ -110,11 +110,15 @@ showSubplots(torch.unsqueeze(activation['Layer3Up'][0,:,:,:], dim=1), 'Layer 3 U
 showSubplots(torch.unsqueeze(activation['Layer4Up'][0,:,:,:], dim=1), 'Layer 4 UP')
 showSubplots(torch.unsqueeze(activation['Layer5Up'][0,:,:,:], dim=1), 'Layer 5 UP')
 
-image = sitk.GetImageFromArray((torch.Tensor.numpy(inputsModel[0,0, :, :])))
-sitk.WriteImage(image, f"Input_Subject{subject}_slice{sliceNro}.nii")
+plt.imshow(torch.Tensor.numpy(inputsModel[0,0, :, :]),cmap = 'gray')
+plt.suptitle(f"Input_Subject{subject}_slice{sliceNro}")
+plt.savefig(f"Input_Subject{subject}_slice{sliceNro}.jpg")
+plt.close()
 
-image = sitk.GetImageFromArray((torch.Tensor.numpy(output[0,0, :, :])))
-sitk.WriteImage(image, f"Output_Subject{subject}_slice{sliceNro}.nii")
+plt.imshow((torch.Tensor.numpy(output[0,0, :, :].detach())),cmap = 'gray')
+plt.suptitle(f"Output_Subject{subject}_slice{sliceNro}")
+plt.savefig(f"Output_Subject{subject}_slice{sliceNro}.jpg")
+plt.close()
 
 modelDT3 = Unet()
 modelDT3.load_state_dict(torch.load('bestModelDataSet3_6'))
