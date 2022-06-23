@@ -42,8 +42,31 @@ def showGridNumpyImg(inputs, outputs, gt, plotTitle):
     plt.show(block=False)
     name = plotTitle+'.png'
     plt.savefig(name)
-
     return
+
+def showSubplots(img, title):
+    cantImages = int(img.shape[0]**(1/2))
+    if cantImages > 5:
+        cantImages = 5
+    rows = cantImages
+    cols = cantImages
+    img_count = 0
+    fig, axes = plt.subplots(nrows=cantImages, ncols=cantImages)
+    for ax in axes.flat:
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        if img_count < img.shape[0]:
+            im = ax.imshow(img[img_count, 0, :, :],cmap = 'gray')
+            img_count = img_count + 1
+
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+    plt.suptitle(title)
+    plt.show(block=False)
+    name = title + '.png'
+    plt.savefig(name)
+    plt.close()
 
 def MSE(img1, img2, cantPixels = None):
     cuadradoDeDif = ((img1 - img2) ** 2)
@@ -168,7 +191,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = 'modelDataSet3_{}_{}'.format(timestamp, epoch)
+            model_path = 'modelDataSet4_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
         print('LOSS train {} valid {}'.format(lossValuesEpoch[-1], lossValuesDevSetAllEpoch[-1]))
@@ -194,6 +217,8 @@ def torchToNp(dataTorch) :
     return img
 
 def testModelSlice(model, inputsDataSet):
+
+    #torch.Tensor.numpy
 
     inputs = inputsDataSet
     inputs = torch.unsqueeze(inputs, dim=0)
@@ -234,7 +259,7 @@ def getTestOneModelOneSlices(inputs, outModel,groundTruth, display = 'False' ,ms
                              mseWhite='False', maskWhite= None, whiteMatterValue=None):
 
     if mse == 'True':
-        mseBef, mseAft = mseAntDspModelTorchSlice(inputs, outModel[0, :, :, :], groundTruth)
+        mseBef, mseAft = mseAntDspModelTorchSlice(inputs, outModel, groundTruth)
         if display == 'True':
             print('MSE:')
             print('MSE antes de pasar por la red', mseBef)
@@ -301,7 +326,9 @@ def covValue(img, maskGrey):
     '''
     materiaGris = img * maskGrey
 
-    materiaGris = np.trim_zeros((torchToNp(materiaGris)).flatten())
+    materiaGris = (torch.Tensor.numpy(materiaGris)).flatten()
+
+    materiaGris = materiaGris[materiaGris != 0.0]
 
     meanMateriaGris = np.mean(materiaGris)
     stdMateriaGris = np.std(materiaGris)
@@ -318,8 +345,11 @@ def crcValue(img, maskGrey, maskWhite):
     materiaBlanca = maskWhite * img
     materiaGris = maskGrey * img
 
-    materiaGris = np.trim_zeros((torchToNp(materiaGris)).flatten())
-    materiaBlanca = np.trim_zeros((torchToNp(materiaBlanca)).flatten())
+    materiaGris = (torch.Tensor.numpy(materiaGris)).flatten()
+    materiaBlanca = (torch.Tensor.numpy(materiaBlanca)).flatten()
+
+    materiaGris  = materiaGris [materiaGris  != 0.0]
+    materiaBlanca = materiaBlanca[materiaBlanca != 0.0]
 
     meanMateriaGris = np.mean(materiaGris)
     meanMateriaBlanca = np.mean(materiaBlanca)
