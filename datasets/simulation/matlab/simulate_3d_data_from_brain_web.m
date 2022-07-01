@@ -16,23 +16,28 @@ else
 end
 %% CONFIGURE PATHS
 % APIRL PATH
-apirlPath = 'C:\Users\Encargado\Milagros\apirl-code\';
+apirlPath = 'D:\Martin\apirl-code\';
 addpath(genpath([apirlPath pathBar 'matlab']));
 setenv('PATH', [getenv('PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
 setenv('LD_LIBRARY_PATH', [getenv('LD_LIBRARY_PATH') sepEnvironment apirlPath pathBar 'build' pathBar 'bin']);
+
+outputPath = 'D:\UNSAM\PET\BrainWebSimulations\';
+if ~isdir(outputPath)
+    mkdir(outputPath)
+end
 %% INIT CLASS GPET
 
 PET.scanner = 'mMR';
-PET.method =  'otf_siddon_cpu';
+PET.method =  'otf_siddon_gpu';
 PET.random_algorithm = 'from_ML_singles_matlab';
-objGpet.PSF.type = 'shift-invar';
+objGpet.PSF.type = 'None';
 objGpet.PSF.Width = 2.5; %mm
 PET = classGpet(PET);
 
 %% BRAIN WEB IMAGES
 % se cargan y se generan los fantomas
 
-brainWebPath = 'C:\Users\Encargado\Milagros\BrainWEB\';
+brainWebPath = 'D:\UNSAM\PET\BrainWEB\';
 imgDir = dir ([brainWebPath]);
 
 
@@ -40,12 +45,22 @@ for i = 3:length(imgDir)
     n = i-2;
     [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), [344 344 127], [2.08625 2.08625 2.03125]);
 
-    pet_rescaled_all_images{n} = pet_rescaled;
-    mumap_rescaled_rescaled_all_images{n} = mumap_rescaled;
-    t1_rescaled_all_images{n} = t1_rescaled;
-    t2_rescaled_all_images{n} = t2_rescaled;
-    classified_tissue_rescaled_all_images{n} = classified_tissue_rescaled;
+    pet_rescaled_all_images{n} = single(pet_rescaled);
+    mumap_rescaled_rescaled_all_images{n} = single(mumap_rescaled);
+    t1_rescaled_all_images{n} =  single(t1_rescaled);
+    t2_rescaled_all_images{n} =  single(t2_rescaled);
+    classified_tissue_rescaled_all_images{n} =  single(classified_tissue_rescaled);
     refImage_all_images{n} = refImage;
+    if n == 1
+        niftiwrite(pet_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_pet', n)], 'Compressed', 1);
+        info = niftiinfo([outputPath sprintf('Phantom_%d_pet', n)]);
+        info.PixelDimensions = PET.image_size.voxelSize_mm;
+    end
+    niftiwriteresorted(pet_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_pet', n)], info, 1);
+    niftiwriteresorted(mumap_rescaled_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_mumap', n)], info, 1);
+    niftiwriteresorted(t1_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_t1', n)], info, 1);
+    niftiwriteresorted(t2_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_t2', n)], info, 1);
+    niftiwriteresorted(classified_tissue_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_tissues', n)], info, 1);
 end
 
 %% PHANTOM TO USE
@@ -66,9 +81,11 @@ param.sinogram_size.span = 11;    % Span 0 is multi slice 2d.
 PET.Revise(param);
 % structSizeSino3d = getSizeSino3dFromSpan(PET.sinogram_size.nRadialBins, PET.sinogram_size.nAnglesBins, PET.sinogram_size.Rings, 0, ...
 %     0, PET.sinogram_size.span, PET.sinogram_size.maxRingDiffs);
-%% 
-countsPorcentaje = [100,50,25,10,5,1];
-countsArray = [469313098,234656549,117328275,46931311,23465656,4693132];
+%%
+fovFactor = 0.8; % The simulation does not account for the activity in the rest of the head.
+counts100perc = 469313098*fovFactor;
+countsPorcentaje = [100 5 1 25 50];%[100,50,25,10,5,1];
+countsArray = round(counts100perc.*countsPorcentaje./100);
 
 %%
 
@@ -95,7 +112,8 @@ for count = 1:size(countsArray,2)
         % Introduce poission noise:
         y = y.*af;
         scale_factor = counts*truesFraction/sum(y(:));
-        y_poisson = poissrnd(y.*scale_factor);
+        y = y.*scale_factor;
+        y_poisson = poissrnd(y);
 
         % Additive factors:
         r = PET.R(counts*randomsFraction); 
@@ -116,9 +134,9 @@ for count = 1:size(countsArray,2)
         sensImage = PET.Sensitivity(af);
         recon = PET.ones();
         noisyDataSet2d{n} = PET.OPOSEM(simulatedSinogram,s+r, sensImage,recon, ceil(60/PET.nSubsets));
-        noisyDataSet2d{n} = permute(noisyDataSet2d{n}, [2 1 3]);
-        noisyDataSet2d{n} = noisyDataSet2d{n}(:,:,end:-1:1);
-        
-        niftiwrite(noisyDataSet2d{n},sprintf('noisyDataSet%d_Subject%d.nii',countsPorcentaje(count),n))
+        %noisyDataSet2d{n} = permute(noisyDataSet2d{n}, [2 1 3]);
+        %noisyDataSet2d{n} = noisyDataSet2d{n}(:,:,end:-1:1);
+        niftiwriteresorted(noisyDataSet2d{n}, [outputPath sprintf('noisyDataSet%d_Subject%d.nii',countsPorcentaje(count),n)], info, 1);
+        %niftiwrite(noisyDataSet2d{n},sprintf('noisyDataSet%d_Subject%d.nii',countsPorcentaje(count),n))
     end
 end

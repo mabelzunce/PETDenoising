@@ -35,7 +35,7 @@ phantom = permute(phantom, [2 1 3]);
 phantom = phantom(end:-1:1,:,end:-1:1);
 fclose(fid);
 imageSizePhantom_pixels = size(phantom);
-classified_tissue = round(phantom./16);
+classified_tissue = phantom;%round(phantom./16);
 %% PHANTOM PARAMETER
 
 indicesCsf = phantom == 1;
