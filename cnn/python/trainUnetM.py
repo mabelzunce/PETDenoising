@@ -30,11 +30,19 @@ epochs = 70
 
 
 # Importo base de datos ...
-path = 'D:/UNSAM/PET/BrainWebSimulations/' #os.getcwd()
-pathGroundTruth = path+'/100'
+path = os.getcwd() #'D:/UNSAM/PET/BrainWebSimulations/'
+#pathGroundTruth = path+'/100'
+pathGroundTruth = path+'/NewDataset/groundTruth/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 trainGroundTruth = []
 validGroundTruth = []
+
+#pathNoisyDataSet = path+'/5'
+pathNoisyDataSet = path+'/NewDataset/noisyDataSet/5'
+arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
+trainNoisyDataSet = []
+validNoisyDataSet = []
+nametrainNoisyDataSet = []
 
 unet = Unet()
 
@@ -44,38 +52,41 @@ print(ramdomIdx)
 nameGroundTruth = []
 for element in arrayGroundTruth:
     pathGroundTruthElement = pathGroundTruth+'/'+element
-    noisyDataSet = sitk.ReadImage(pathGroundTruthElement)
-    noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
+    groundTruthDataSet = sitk.ReadImage(pathGroundTruthElement)
+    groundTruthDataSet = sitk.GetArrayFromImage(groundTruthDataSet)
     name, extension = os.path.splitext(element)
-    if extension == '.gz':
+    if extension == '.nii':
         name, extension2 = os.path.splitext(name)
     ind = name.find('Subject')
     name = name[ind + len('Subject'):]
     nameGroundTruth.append(name)
-    if int(name) not in ramdomIdx:
-        trainGroundTruth.append(noisyDataSet)
-    else:
-        validGroundTruth.append(noisyDataSet)
 
-pathNoisyDataSet = path+'/5'
-arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
-trainNoisyDataSet = []
-validNoisyDataSet = []
-nametrainNoisyDataSet = []
-for element in arrayNoisyDataSet:
-    pathNoisyDataSetElement = pathNoisyDataSet+'/'+element
+    nametrainNoisyDataSet = 'noisyDataSet5_Subject'+name+'.nii'
+    pathNoisyDataSetElement = pathNoisyDataSet + '/' + nametrainNoisyDataSet
     noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
     noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
-    name, extension = os.path.splitext(element)
-    if extension == '.gz':
-        name, extension2 = os.path.splitext(name)
-    ind = name.find('Subject')
-    name = name[ind + len('Subject'):]
-    nametrainNoisyDataSet.append(name)
+
     if int(name) not in ramdomIdx:
+        trainGroundTruth.append(groundTruthDataSet)
         trainNoisyDataSet.append(noisyDataSet)
     else:
+        validGroundTruth.append(groundTruthDataSet)
         validNoisyDataSet.append(noisyDataSet)
+
+#for element in arrayNoisyDataSet:
+#    pathNoisyDataSetElement = pathNoisyDataSet+'/'+element
+#    noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
+#    noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
+#    name, extension = os.path.splitext(element)
+#    if extension == '.nii':
+#        name, extension2 = os.path.splitext(name)
+#    ind = name.find('Subject')
+#    name = name[ind + len('Subject'):]
+#    nametrainNoisyDataSet.append(name)
+#    if int(name) not in ramdomIdx:
+#        trainNoisyDataSet.append(noisyDataSet)
+#    else:
+#        validNoisyDataSet.append(noisyDataSet)
 
 
 ## Set de entramiento
@@ -95,15 +106,6 @@ for subject in range(0, len(trainNoisyDataSet)):
             trainGroundTruthNorm.append(normGroundTruth )
             trainGroundTruthNorm.append(np.rot90(normGroundTruth))
 
-#for subject in range(0,len(trainGroundTruth)):
-    #subjectElement = trainGroundTruth[subject]
-    #for slice in range(0,subjectElement.shape[0]):
-        #maxSlice = subjectElement[slice,:,:].max()
-        #if (maxSlice > 0.0):
-            #norm = ((subjectElement[slice,:,:] / maxSlice))
-            #trainGroundTruthNorm.append(norm)
-            #trainGroundTruthNorm.append(np.rot90(norm))
-
 # Set de validacion
 validNoisyDataSetNorm = []
 validGroundTruthNorm = []
@@ -120,15 +122,6 @@ for subject in range(0, len(validNoisyDataSet)):
             normGroundTruth = ((subjectElementGroundTruth[slice, :, :]) / maxSliceGroundTruth)
             validGroundTruthNorm.append(normGroundTruth)
             validGroundTruthNorm.append(np.rot90(normGroundTruth))
-
-#for subject in range(0, len(validGroundTruth)):
-#    subjectElement = validGroundTruth[subject]
-#    for slice in range(0, subjectElement.shape[0]):
-#        maxSlice = subjectElement[slice, :, :].max()
-#        if (maxSlice > 0.0):
-#            norm = ((subjectElement[slice, :, :] / maxSlice))
-#            validGroundTruthNorm.append(norm)
-            #validGroundTruthNorm.append(np.rot90(norm))
 
 trainGroundTruthNorm = np.array(trainGroundTruthNorm)
 validGroundTruthNorm = np.array(validGroundTruthNorm)
