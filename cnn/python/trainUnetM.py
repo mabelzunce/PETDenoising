@@ -20,10 +20,18 @@ from utils import trainModel
 from utils import reshapeDataSet
 from unetM import Unet
 
+######################### CHECK DEVICE ######################
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
+
+######################## TRAINING PARAMETERS ###############
+batchSize = 4
+epochs = 70
+
 
 # Importo base de datos ...
-path = os.getcwd()
-pathGroundTruth = path+'/NewDataset/groundTruth/100'
+path = 'D:/UNSAM/PET/BrainWebSimulations/' #os.getcwd()
+pathGroundTruth = path+'/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 trainGroundTruth = []
 validGroundTruth = []
@@ -38,14 +46,18 @@ for element in arrayGroundTruth:
     pathGroundTruthElement = pathGroundTruth+'/'+element
     noisyDataSet = sitk.ReadImage(pathGroundTruthElement)
     noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
-    name = element[23:-4]
+    name, extension = os.path.splitext(element)
+    if extension == '.gz':
+        name, extension2 = os.path.splitext(name)
+    ind = name.find('Subject')
+    name = name[ind + len('Subject'):]
     nameGroundTruth.append(name)
-    if name not in str(ramdomIdx):
+    if int(name) not in ramdomIdx:
         trainGroundTruth.append(noisyDataSet)
     else:
         validGroundTruth.append(noisyDataSet)
 
-pathNoisyDataSet = path+'/NewDataset/noisyDataSet/5'
+pathNoisyDataSet = path+'/5'
 arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
 trainNoisyDataSet = []
 validNoisyDataSet = []
@@ -54,9 +66,13 @@ for element in arrayNoisyDataSet:
     pathNoisyDataSetElement = pathNoisyDataSet+'/'+element
     noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
     noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
-    name = element[21:-4]
+    name, extension = os.path.splitext(element)
+    if extension == '.gz':
+        name, extension2 = os.path.splitext(name)
+    ind = name.find('Subject')
+    name = name[ind + len('Subject'):]
     nametrainNoisyDataSet.append(name)
-    if name not in str(ramdomIdx):
+    if int(name) not in ramdomIdx:
         trainNoisyDataSet.append(noisyDataSet)
     else:
         validNoisyDataSet.append(noisyDataSet)
@@ -133,6 +149,7 @@ print('Valid Noisy Dataset:',validNoisyDataSetNorm.shape)
 df = pd.DataFrame(ramdomIdx)
 df.to_excel('validSubjectsModel6.xlsx')
 
+
 # Create dictionaries with training sets:
 trainingSet = dict([('input',trainNoisyDataSetNorm), ('output', trainGroundTruthNorm)])
 validSet = dict([('input',validNoisyDataSetNorm), ('output', validGroundTruthNorm)])
@@ -145,7 +162,8 @@ print('Data set size. Training set: {0}. Valid set: {1}.'.format(trainingSet['in
 criterion = nn.MSELoss()
 optimizer = optim.Adam(unet.parameters(), lr=0.0001)
 
-lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer,4,70,save = True, name = 'Model6')
+
+lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer, batchSize, epochs, device, save = True, name = 'Model6')
 
 df = pd.DataFrame(lossValuesTraining)
 df.to_excel('lossValuesTrainingSetBatchModel6Total.xlsx')

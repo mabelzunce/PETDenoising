@@ -80,7 +80,7 @@ def MSE(img1, img2, cantPixels = None):
     error = suma / cantPix
     return error
 
-def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, pre_trained = False, save = True, name = None):
+def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, device, pre_trained = False, save = True, name = None):
     # defino batches
     # Return
     # lossValuesTrainingSet: loss por batch para trainSet
@@ -120,6 +120,8 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     iter = 0
 
     EPOCHS = epochs
+    # Transfer tensors and model to device:
+    model.to(device)
 
     for epoch in range(EPOCHS):  # loop over the dataset multiple times
 
@@ -132,8 +134,8 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
         for i in range(numBatchesTrain):
             # get the inputs
 
-            inputs = torch.from_numpy(trainSet['input'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :])
-            gt = torch.from_numpy(trainSet['output'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :])
+            inputs = torch.from_numpy(trainSet['input'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :]).to(device)
+            gt = torch.from_numpy(trainSet['output'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :]).to(device)
 
             # zero the parameter gradients
             optimizer.zero_grad()
@@ -156,12 +158,12 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
                       (epoch + 1, i + 1, running_loss))
                 running_loss = 0.0
 
-                #x = np.arange(0, len(lossValuesTrainingSet))
-                #y1 = lossValuesTrainingSet
-                #plt.plot(x, y1)
-                #plt.title('Batch train set')
-                #plt.draw()
-                #plt.pause(0.0001)
+                x = np.arange(0, len(lossValuesTrainingSet))
+                y1 = lossValuesTrainingSet
+                plt.plot(x, y1)
+                plt.title('Batch train set')
+                plt.draw()
+                plt.pause(0.0001)
 
             iter = iter + 1
 
@@ -172,8 +174,8 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
         for i in range(numBatchesValid):
             print(i)
 
-            vinputs = torch.from_numpy(validSet['input'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :])
-            vgt = torch.from_numpy(validSet['output'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :])
+            vinputs = torch.from_numpy(validSet['input'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
+            vgt = torch.from_numpy(validSet['output'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
 
             voutputs = model(vinputs)
             vloss = criterion(voutputs, vgt)
