@@ -1,5 +1,7 @@
 import torch
 import torchvision
+import os
+import pandas as pd
 import numpy as np
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
@@ -42,8 +44,31 @@ def showGridNumpyImg(inputs, outputs, gt, plotTitle):
     plt.show(block=False)
     name = plotTitle+'.png'
     plt.savefig(name)
-
     return
+
+def showSubplots(img, title):
+    cantImages = int(img.shape[0]**(1/2))
+    if cantImages > 5:
+        cantImages = 5
+    rows = cantImages
+    cols = cantImages
+    img_count = 0
+    fig, axes = plt.subplots(nrows=cantImages, ncols=cantImages)
+    for ax in axes.flat:
+        ax.get_xaxis().set_visible(False)
+        ax.get_yaxis().set_visible(False)
+        if img_count < img.shape[0]:
+            im = ax.imshow(img[img_count, 0, :, :],cmap = 'gray')
+            img_count = img_count + 1
+
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(im, cax=cbar_ax)
+    plt.suptitle(title)
+    plt.show(block=False)
+    name = title + '.png'
+    plt.savefig(name)
+    plt.close()
 
 def MSE(img1, img2, cantPixels = None):
     cuadradoDeDif = ((img1 - img2) ** 2)
@@ -55,7 +80,7 @@ def MSE(img1, img2, cantPixels = None):
     error = suma / cantPix
     return error
 
-def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, pre_trained = False):
+def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, pre_trained = False, save = True, name = None):
     # defino batches
 
     best_vloss = 1000000000
@@ -74,15 +99,19 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     # Train
+    iterationNumbers = []
+
     loss_values = []
     lossValuesTrainingSet = []
-    iterationNumbers = []
+
+
     lossValuesDevSet = []
     iterationNumbersForDevSet = []
     lossValuesTrainingSetEpoch = []
 
     lossValuesEpoch = []
     lossValuesDevSetAllEpoch = []
+    lossValueTrainingSetAllEpoch = []
 
     iter = 0
 
@@ -123,28 +152,9 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
                       (epoch + 1, i + 1, running_loss))
                 running_loss = 0.0
 
-            # Show input images:
-            # plt.figure(figImages)
-            # plt.axes(axs[0])
-            # imshow(torchvision.utils.make_grid(inputs, normalize=True))
-            # axs[0].set_title('Input Batch {0}'.format(i))
-            # plt.axes(axs[1])
-            # imshow(torchvision.utils.make_grid(outputs, normalize=True))
-            # axs[1].set_title('Output Epoch {0}'.format(epoch))
-            # plt.axes(axs[2])
-            # imshow(torchvision.utils.make_grid(gt, normalize=True))
-            # axs[2].set_title('Ground Truth')
-            # Show loss:
-            # plt.figure(figLoss)
-            # axLoss.plot(iterationNumbers, lossValuesTrainingSet)
-            # axLoss.plot(iterationNumbersForDevSet, lossValuesDevSet)
-            # plt.draw()
-            # plt.pause(0.0001)
-
-            # Update iteration number:
             iter = iter + 1
 
-        lossValuesEpoch.append(np.mean(lossValuesTrainingSetEpoch))
+        lossValueTrainingSetAllEpoch.append(np.mean(lossValuesTrainingSetEpoch))
         model.train(False)
         running_vloss = 0.0
 
@@ -168,11 +178,39 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = 'modelDataSet3_{}_{}'.format(timestamp, epoch)
+            model_path = 'modelDataSet6_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
-        print('LOSS train {} valid {}'.format(lossValuesEpoch[-1], lossValuesDevSetAllEpoch[-1]))
+
+        print('LOSS train {} valid {}'.format(lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
         # CALCULAR PROMEDIO DE TODOS O VARIOS BATCH
+
+        if (save == True) and (epoch%5 == 0):
+
+            nameArch = 'lossValuesTrainingSetBatch'+name+'.xlsx'
+            df = pd.DataFrame(lossValuesTrainingSet)
+            df.to_excel(nameArch)
+
+            nameArch = 'lossValuesTrainingSetEpoch' + name + '.xlsx'
+            df = pd.DataFrame(lossValuesEpoch)
+            df.to_excel(nameArch)
+
+            nameArch = 'lossValuesDevSetBatch' + name + '.xlsx'
+            df = pd.DataFrame(lossValuesDevSet)
+            df.to_excel(nameArch)
+
+            nameArch = 'lossValuesDevSetEpoch' + name + '.xlsx'
+            df = pd.DataFrame(lossValuesDevSetAllEpoch)
+            df.to_excel(nameArch)
+
+            x = np.arange(0, len(lossValueTrainingSetAllEpoch))
+            y1 = lossValueTrainingSetAllEpoch
+            y2 = lossValuesDevSetAllEpoch
+            plt.plot(x, y1)
+            plt.plot(x, y2)
+            plt.title('Epochs')
+            plt.draw()
+            plt.pause(0.0001)
 
     print('Finished Training')
 
@@ -194,6 +232,8 @@ def torchToNp(dataTorch) :
     return img
 
 def testModelSlice(model, inputsDataSet):
+
+    #torch.Tensor.numpy
 
     inputs = inputsDataSet
     inputs = torch.unsqueeze(inputs, dim=0)
@@ -234,7 +274,7 @@ def getTestOneModelOneSlices(inputs, outModel,groundTruth, display = 'False' ,ms
                              mseWhite='False', maskWhite= None, whiteMatterValue=None):
 
     if mse == 'True':
-        mseBef, mseAft = mseAntDspModelTorchSlice(inputs, outModel[0, :, :, :], groundTruth)
+        mseBef, mseAft = mseAntDspModelTorchSlice(inputs, outModel, groundTruth)
         if display == 'True':
             print('MSE:')
             print('MSE antes de pasar por la red', mseBef)
@@ -301,7 +341,9 @@ def covValue(img, maskGrey):
     '''
     materiaGris = img * maskGrey
 
-    materiaGris = np.trim_zeros((torchToNp(materiaGris)).flatten())
+    materiaGris = (torch.Tensor.numpy(materiaGris)).flatten()
+
+    materiaGris = materiaGris[materiaGris != 0.0]
 
     meanMateriaGris = np.mean(materiaGris)
     stdMateriaGris = np.std(materiaGris)
@@ -318,8 +360,11 @@ def crcValue(img, maskGrey, maskWhite):
     materiaBlanca = maskWhite * img
     materiaGris = maskGrey * img
 
-    materiaGris = np.trim_zeros((torchToNp(materiaGris)).flatten())
-    materiaBlanca = np.trim_zeros((torchToNp(materiaBlanca)).flatten())
+    materiaGris = (torch.Tensor.numpy(materiaGris)).flatten()
+    materiaBlanca = (torch.Tensor.numpy(materiaBlanca)).flatten()
+
+    materiaGris  = materiaGris [materiaGris  != 0.0]
+    materiaBlanca = materiaBlanca[materiaBlanca != 0.0]
 
     meanMateriaGris = np.mean(materiaGris)
     meanMateriaBlanca = np.mean(materiaBlanca)
