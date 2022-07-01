@@ -82,6 +82,11 @@ def MSE(img1, img2, cantPixels = None):
 
 def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, pre_trained = False, save = True, name = None):
     # defino batches
+    # Return
+    # lossValuesTrainingSet: loss por batch para trainSet
+    # lossValueTrainingSetAllEpoch: loss por epoca para trainSet
+    # lossValuesDevSet: loss por batch para validSet
+    # lossValuesDevSetAllEpoch: loss por epoca para validSet
 
     best_vloss = 1000000000
 
@@ -109,7 +114,6 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     iterationNumbersForDevSet = []
     lossValuesTrainingSetEpoch = []
 
-    lossValuesEpoch = []
     lossValuesDevSetAllEpoch = []
     lossValueTrainingSetAllEpoch = []
 
@@ -152,6 +156,13 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
                       (epoch + 1, i + 1, running_loss))
                 running_loss = 0.0
 
+                #x = np.arange(0, len(lossValuesTrainingSet))
+                #y1 = lossValuesTrainingSet
+                #plt.plot(x, y1)
+                #plt.title('Batch train set')
+                #plt.draw()
+                #plt.pause(0.0001)
+
             iter = iter + 1
 
         lossValueTrainingSetAllEpoch.append(np.mean(lossValuesTrainingSetEpoch))
@@ -183,7 +194,6 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
 
         print('LOSS train {} valid {}'.format(lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
-        # CALCULAR PROMEDIO DE TODOS O VARIOS BATCH
 
         if (save == True) and (epoch%5 == 0):
 
@@ -192,7 +202,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             df.to_excel(nameArch)
 
             nameArch = 'lossValuesTrainingSetEpoch' + name + '.xlsx'
-            df = pd.DataFrame(lossValuesEpoch)
+            df = pd.DataFrame(lossValueTrainingSetAllEpoch)
             df.to_excel(nameArch)
 
             nameArch = 'lossValuesDevSetBatch' + name + '.xlsx'
@@ -214,7 +224,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
     print('Finished Training')
 
-    return lossValuesTrainingSet, lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch
+    return lossValuesTrainingSet, lossValueTrainingSetAllEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch
 
 def reshapeDataSet(dataset):
 
