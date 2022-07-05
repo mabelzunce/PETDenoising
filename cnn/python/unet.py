@@ -75,6 +75,14 @@ class OutConv(nn.Module):
         x = self.conv(x)
         return x
 
+class AddResidual(nn.Module):
+    def __init__(self):
+        super(AddResidual, self).__init__()
+
+    def forward(self, x, residual):
+        x = x + residual
+        return x
+
 class Unet(nn.Module):
     def __init__(self, in_channels, classes):
         super(Unet, self).__init__()
@@ -104,3 +112,35 @@ class Unet(nn.Module):
         x = self.up4(x, x1)
         x = self.outc(x)
         return x
+
+class UnetWithResidual(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(UnetWithResidual, self).__init__()
+        self.n_channels = in_channels
+        self.n_classes =  out_channels
+
+        self.inc = InConv(in_channels, 64)
+        self.down1 = Down(64, 128)
+        self.down2 = Down(128, 256)
+        self.down3 = Down(256, 512)
+        self.down4 = Down(512, 512)
+        self.up1 = Up(1024, 256)
+        self.up2 = Up(512, 128)
+        self.up3 = Up(256, 64)
+        self.up4 = Up(128, 64)
+        self.outc = OutConv(64, out_channels)
+        self.add_res = AddResidual()
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        y4 = self.up1(x5, x4)
+        y3 = self.up2(y4, x3)
+        y2 = self.up3(y3, x2)
+        y1 = self.up4(y2, x1)
+        res = self.outc(y1)
+        y = self.add_res(x, res)
+        return y
