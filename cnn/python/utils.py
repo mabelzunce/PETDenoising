@@ -213,7 +213,6 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             axs_epochs[0].set_xlabel('Epochs')
             axs_epochs[0].set_ylabel('MSE')
             # Show input images:
-            plt.figure(figImages)
             plt.axes(axs_epochs[1])
             imshow(torchvision.utils.make_grid(inputs.cpu(), normalize=True, nrow=numImagesPerRow))
             axs_epochs[1].set_title('Input Batch {0}, Epoch {1}'.format(i, epoch))
@@ -236,7 +235,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         print('LOSS train {} valid {}'.format(lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
-        if (save == True) and (epoch%saveResultsInterval_epochs == 0):
+        if (save == True) and (epoch%saveInterval_epochs == 0):
 
             nameArch = name + '_lossValuesTrainingSetBatch'+'.xlsx'
             df = pd.DataFrame(lossValuesTrainingSet)
