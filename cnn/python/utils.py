@@ -1,6 +1,7 @@
 import torch
 import torchvision
 import os
+import math
 import pandas as pd
 import numpy as np
 import SimpleITK as sitk
@@ -80,7 +81,8 @@ def MSE(img1, img2, cantPixels = None):
     error = suma / cantPix
     return error
 
-def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, device, pre_trained = False, save = True, name = None):
+def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, device, pre_trained = False, save = True, saveInterval_epochs = 5, name = None,
+               printStep_batches = math.inf, plotStep_batches = math.inf, printStep_epochs = 1, plotStep_epochs = 1):
     # defino batches
     # Return
     # lossValuesTrainingSet: loss por batch para trainSet
@@ -88,19 +90,20 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     # lossValuesDevSet: loss por batch para validSet
     # lossValuesDevSetAllEpoch: loss por epoca para validSet
 
+    # Visualization:
+    numImagesPerRow = 4
+    if plotStep_batches != math.inf:
+        figBatches, axs_batches = plt.subplots(1, 4, figsize=(25, 8))
+    if plotStep_epochs != math.inf:
+        figEpochs, axs_epochs = plt.subplots(1, 4, figsize=(25, 8))
+
+    # Training:
     best_vloss = 1000000000
 
     batchSizeTrain = num_batch
     batchSizeValid = num_batch
     numBatchesTrain = np.round(trainSet['input'].shape[0] / batchSizeTrain).astype(int)
     numBatchesValid = np.round(validSet['input'].shape[0] / batchSizeValid).astype(int)
-
-    # Show dev set loss every showDevLossStep batches:
-    showDevLossStep = 4
-
-    printStep = 1
-    # figImages, axs = plt.subplots(3, 1,figsize=(20,20))
-    # figLoss, axLoss = plt.subplots(1, 1,figsize=(5,5))
 
     timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
     # Train
@@ -117,13 +120,10 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     lossValuesDevSetAllEpoch = []
     lossValueTrainingSetAllEpoch = []
 
-    iter = 0
-
-    EPOCHS = epochs
     # Transfer tensors and model to device:
     model.to(device)
 
-    for epoch in range(EPOCHS):  # loop over the dataset multiple times
+    for epoch in range(epochs):  # loop over the dataset multiple times
 
         lossValuesTrainingSetEpoch = []
         lossValuesDevSetEpoch = []
@@ -153,27 +153,41 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             lossValuesTrainingSetEpoch.append(loss.item())
             iterationNumbers.append(iter)
 
-            if i % printStep == (printStep - 1):  # print every printStep mini-batches
+            if i % printStep_batches == (printStep_batches - 1):  # print every printStep mini-batches
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss))
                 running_loss = 0.0
 
+            if i % plotStep_batches == (plotStep_batches - 1):
                 x = np.arange(0, len(lossValuesTrainingSet))
                 y1 = lossValuesTrainingSet
+                plt.figure(figBatches)
+                plt.axes(axs_batches[0])
                 plt.plot(x, y1)
-                plt.title('Batch train set')
+                plt.title('Training')
+                axs_batches[0].set_xlabel('Batches')
+                axs_batches[0].set_ylabel('MSE')
                 plt.draw()
                 plt.pause(0.0001)
-
-            iter = iter + 1
+                # Show input images:
+                plt.axes(axs_batches[1])
+                imshow(torchvision.utils.make_grid(inputs.cpu(), normalize=True, nrow = numImagesPerRow))
+                axs_batches[0].set_title('Input Batch {0}, Epoch {1}'.format(i, epoch))
+                plt.axes(axs_batches[2])
+                imshow(torchvision.utils.make_grid(outputs.cpu(), normalize=True, nrow = numImagesPerRow))
+                axs_batches[1].set_title('Output Batch {0}, Epoch {1}'.format(i, epoch))
+                plt.axes(axs_batches[3])
+                imshow(torchvision.utils.make_grid(gt.cpu(), normalize=True, nrow = numImagesPerRow))
+                axs_batches[2].set_title('Ground Truth')
+                plt.draw()
+                plt.pause(0.0001)
+                plt.savefig(name + '_training_batch_{0}_epoch_{1}.png'.format(i, epoch))
 
         lossValueTrainingSetAllEpoch.append(np.mean(lossValuesTrainingSetEpoch))
         model.train(False)
         running_vloss = 0.0
 
         for i in range(numBatchesValid):
-            print(i)
-
             vinputs = torch.from_numpy(validSet['input'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
             vgt = torch.from_numpy(validSet['output'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
 
@@ -181,13 +195,38 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             vloss = criterion(voutputs, vgt)
             vloss.backward()
             running_vloss += vloss
-
+            if i % printStep_batches == (printStep_batches - 1):  # print every printStep mini-batches
+                print('[%d, %5d] validation loss: %.3f' %
+                      (epoch + 1, i + 1, vloss.item()))
             lossValuesDevSet.append(vloss.item())
-
             lossValuesDevSetEpoch.append(vloss.item())
-
         avg_vloss = np.mean(lossValuesDevSetEpoch)
         lossValuesDevSetAllEpoch.append(np.mean(lossValuesDevSetEpoch))
+
+        if i % plotStep_epochs == (plotStep_epochs - 1):
+            plt.figure(figEpochs)
+            # Show loss:
+            plt.axes(axs_epochs[0])
+            plt.plot(np.arange(0, epoch+1), lossValueTrainingSetAllEpoch, label='Training Set')
+            plt.plot(np.arange(0.5, (epoch + 1)), lossValuesDevSetAllEpoch, label='Validation Set') # Validation always shifted 0.5
+            plt.title('Training/Validation')
+            axs_epochs[0].set_xlabel('Epochs')
+            axs_epochs[0].set_ylabel('MSE')
+            # Show input images:
+            plt.figure(figImages)
+            plt.axes(axs_epochs[1])
+            imshow(torchvision.utils.make_grid(inputs.cpu(), normalize=True, nrow=numImagesPerRow))
+            axs_epochs[1].set_title('Input Batch {0}, Epoch {1}'.format(i, epoch))
+            plt.axes(axs_epochs[2])
+            imshow(torchvision.utils.make_grid(outputs.cpu(), normalize=True, nrow=numImagesPerRow))
+            axs_epochs[2].set_title('Output Batch {0}, Epoch {1}'.format(i, epoch))
+            plt.axes(axs_epochs[3])
+            imshow(torchvision.utils.make_grid(gt.cpu(), normalize=True, nrow=numImagesPerRow))
+            axs_epochs[3].set_title('Ground Truth')
+            plt.draw()
+            plt.pause(0.0001)
+            plt.savefig(name + '_training_epoch_{0}.png'.format(epoch))
+
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
@@ -197,21 +236,21 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         print('LOSS train {} valid {}'.format(lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
-        if (save == True) and (epoch%5 == 0):
+        if (save == True) and (epoch%saveResultsInterval_epochs == 0):
 
-            nameArch = 'lossValuesTrainingSetBatch'+name+'.xlsx'
+            nameArch = name + '_lossValuesTrainingSetBatch'+'.xlsx'
             df = pd.DataFrame(lossValuesTrainingSet)
             df.to_excel(nameArch)
 
-            nameArch = 'lossValuesTrainingSetEpoch' + name + '.xlsx'
+            nameArch = name + '_lossValuesTrainingSetEpoch' + '.xlsx'
             df = pd.DataFrame(lossValueTrainingSetAllEpoch)
             df.to_excel(nameArch)
 
-            nameArch = 'lossValuesDevSetBatch' + name + '.xlsx'
+            nameArch = name + '_lossValuesDevSetBatch' + '.xlsx'
             df = pd.DataFrame(lossValuesDevSet)
             df.to_excel(nameArch)
 
-            nameArch = 'lossValuesDevSetEpoch' + name + '.xlsx'
+            nameArch = name + '_lossValuesDevSetEpoch' + '.xlsx'
             df = pd.DataFrame(lossValuesDevSetAllEpoch)
             df.to_excel(nameArch)
 
