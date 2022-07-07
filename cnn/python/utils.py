@@ -203,7 +203,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
         avg_vloss = np.mean(lossValuesDevSetEpoch)
         lossValuesDevSetAllEpoch.append(np.mean(lossValuesDevSetEpoch))
 
-        if i % plotStep_epochs == (plotStep_epochs - 1):
+        if (epochs % plotStep_epochs) == (plotStep_epochs - 1):
             plt.figure(figEpochs)
             # Show loss:
             plt.axes(axs_epochs[0])
@@ -229,38 +229,32 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = 'modelDataSet6_{}_{}'.format(timestamp, epoch)
+            model_path = name + '_{}_{}_best_fit'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
-
-        print('LOSS train {} valid {}'.format(lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
+        if (i % printStep_epochs) == (printStep_epochs - 1):
+            print('[Epoch {0}. Time: {1}.]. Training loss: {2}. Validation loss: {3}'.format(epoch, datetime.now(),lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
         if (save == True) and (epoch%saveInterval_epochs == 0):
+            model_path = name + '_{}_{}'.format(timestamp, epoch)
+            torch.save(model.state_dict(), model_path)
 
-            nameArch = name + '_lossValuesTrainingSetBatch'+'.xlsx'
+            nameArch = name + '_lossValuesTrainingSetBatch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValuesTrainingSet)
             df.to_excel(nameArch)
 
-            nameArch = name + '_lossValuesTrainingSetEpoch' + '.xlsx'
+            nameArch = name + '_lossValuesTrainingSetEpoch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValueTrainingSetAllEpoch)
             df.to_excel(nameArch)
 
-            nameArch = name + '_lossValuesDevSetBatch' + '.xlsx'
+            nameArch = name + '_lossValuesDevSetBatch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValuesDevSet)
             df.to_excel(nameArch)
 
-            nameArch = name + '_lossValuesDevSetEpoch' + '.xlsx'
+            nameArch = name + '_lossValuesDevSetEpoch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValuesDevSetAllEpoch)
             df.to_excel(nameArch)
 
-            x = np.arange(0, len(lossValueTrainingSetAllEpoch))
-            y1 = lossValueTrainingSetAllEpoch
-            y2 = lossValuesDevSetAllEpoch
-            plt.plot(x, y1)
-            plt.plot(x, y2)
-            plt.title('Epochs')
-            plt.draw()
-            plt.pause(0.0001)
 
     print('Finished Training')
 

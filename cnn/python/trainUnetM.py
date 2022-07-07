@@ -4,6 +4,8 @@ import SimpleITK as sitk
 import matplotlib.pyplot as plt
 import numpy
 import numpy as np
+from scipy.ndimage import rotate
+from sklearn.utils import shuffle
 import os
 
 import torch
@@ -18,33 +20,37 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from utils import trainModel
 from utils import reshapeDataSet
-from unetM import Unet
+from unet import Unet
+from unet import UnetWithResidual
 
 ######################### CHECK DEVICE ######################
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 ######################## TRAINING PARAMETERS ###############
-batchSize = 4
-epochs = 70
-
+batchSize = 8
+epochs = 100
+learning_rate=0.00005
 
 # Importo base de datos ...
-path = os.getcwd() #'D:/UNSAM/PET/BrainWebSimulations/'
-#pathGroundTruth = path+'/100'
-pathGroundTruth = path+'/NewDataset/groundTruth/100'
+path = os.getcwd() #
+path = 'D:/UNSAM/PET/BrainWebSimulations/'
+pathGroundTruth = path+'/100'
+#pathGroundTruth = path+'/NewDataset/groundTruth/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 trainGroundTruth = []
 validGroundTruth = []
 
-#pathNoisyDataSet = path+'/5'
-pathNoisyDataSet = path+'/NewDataset/noisyDataSet/5'
+pathNoisyDataSet = path+'/5'
+#pathNoisyDataSet = path+'/NewDataset/noisyDataSet/5'
 arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
 trainNoisyDataSet = []
 validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
-unet = Unet()
+#unet = Unet()
+unet = Unet(1, 1)
+unet = UnetWithResidual(1, 1)
 
 ramdomIdx = np.random.randint(1, len(arrayGroundTruth)+1, 2).tolist()
 print(ramdomIdx)
@@ -55,13 +61,14 @@ for element in arrayGroundTruth:
     groundTruthDataSet = sitk.ReadImage(pathGroundTruthElement)
     groundTruthDataSet = sitk.GetArrayFromImage(groundTruthDataSet)
     name, extension = os.path.splitext(element)
-    if extension == '.nii':
+    if extension == '.gz':
         name, extension2 = os.path.splitext(name)
+        extension = extension2 + extension
     ind = name.find('Subject')
     name = name[ind + len('Subject'):]
     nameGroundTruth.append(name)
 
-    nametrainNoisyDataSet = 'noisyDataSet5_Subject'+name+'.nii'
+    nametrainNoisyDataSet = 'noisyDataSet5_Subject'+name+ extension
     pathNoisyDataSetElement = pathNoisyDataSet + '/' + nametrainNoisyDataSet
     noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
     noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
@@ -96,15 +103,17 @@ for subject in range(0, len(trainNoisyDataSet)):
     subjectElementNoisy = trainNoisyDataSet[subject]
     subjectElementGroundTruth = trainGroundTruth[subject]
     for slice in range(0, subjectElementNoisy.shape[0]):
-        maxSliceNoisy = subjectElementNoisy[slice, :, :].mean()
-        maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].mean()
+        maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
+        maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
         if (maxSliceNoisy > 0.0000001) and (maxSliceGroundTruth > 0.0) :
             normNoisy = ((subjectElementNoisy[slice, :, :]) / maxSliceNoisy)
             trainNoisyDataSetNorm.append(normNoisy)
             trainNoisyDataSetNorm.append(np.rot90(normNoisy))
+            trainNoisyDataSetNorm.append(rotate(normNoisy, angle=45, reshape=False))
             normGroundTruth = ((subjectElementGroundTruth[slice, :, :]) / maxSliceGroundTruth)
             trainGroundTruthNorm.append(normGroundTruth )
             trainGroundTruthNorm.append(np.rot90(normGroundTruth))
+            trainGroundTruthNorm.append(rotate(normGroundTruth, angle=45, reshape=False))
 
 # Set de validacion
 validNoisyDataSetNorm = []
@@ -119,9 +128,12 @@ for subject in range(0, len(validNoisyDataSet)):
             normNoisy = ((subjectElementNoisy[slice, :, :]) / maxSliceNoisy)
             validNoisyDataSetNorm.append(normNoisy)
             validNoisyDataSetNorm.append(np.rot90(normNoisy))
+            validNoisyDataSetNorm.append(rotate(normNoisy, angle=45, reshape=False))
             normGroundTruth = ((subjectElementGroundTruth[slice, :, :]) / maxSliceGroundTruth)
             validGroundTruthNorm.append(normGroundTruth)
             validGroundTruthNorm.append(np.rot90(normGroundTruth))
+            validGroundTruthNorm.append(rotate(normGroundTruth, angle=45, reshape=False))
+
 
 trainGroundTruthNorm = np.array(trainGroundTruthNorm)
 validGroundTruthNorm = np.array(validGroundTruthNorm)
@@ -132,6 +144,10 @@ trainGroundTruthNorm = reshapeDataSet(trainGroundTruthNorm)
 validGroundTruthNorm = reshapeDataSet(validGroundTruthNorm)
 trainNoisyDataSetNorm = reshapeDataSet(trainNoisyDataSetNorm)
 validNoisyDataSetNorm = reshapeDataSet(validNoisyDataSetNorm)
+
+# Shuffle the data:
+trainNoisyDataSetNorm, trainGroundTruthNorm = shuffle(trainNoisyDataSetNorm, trainGroundTruthNorm, random_state=0)
+validNoisyDataSetNorm, validGroundTruthNorm = shuffle(validNoisyDataSetNorm, validGroundTruthNorm, random_state=0)
 
 print('Train GT:',trainGroundTruthNorm.shape)
 print('Valid GT:',validGroundTruthNorm.shape)
@@ -153,10 +169,12 @@ print('Data set size. Training set: {0}. Valid set: {1}.'.format(trainingSet['in
 # Loss and optimizer
 
 criterion = nn.MSELoss()
-optimizer = optim.Adam(unet.parameters(), lr=0.0001)
+optimizer = optim.Adam(unet.parameters(), lr=learning_rate)
 
 
-lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer, batchSize, epochs, device, save = True, name = 'Model6')
+lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer, batchSize,
+                                                                                            epochs, device, save = True, name = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate),
+                                                                                            printStep_epochs = 1, plotStep_epochs = 1)
 
 df = pd.DataFrame(lossValuesTraining)
 df.to_excel('lossValuesTrainingSetBatchModel6Total.xlsx')
