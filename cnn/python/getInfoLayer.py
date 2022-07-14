@@ -19,8 +19,10 @@ from datetime import datetime
 from utils import trainModel
 from utils import reshapeDataSet
 from utils import showSubplots
-from unetM import Unet
-import unetM
+#from unetM import Unet
+#import unetM
+
+from unet import UnetWithResidual
 
 path = os.getcwd()
 pathGroundTruth = path+'/groundTruth/100'
@@ -66,94 +68,88 @@ groundTruthArray = np.array(groundTruthArray)
 noisyImagesArray = torch.from_numpy(noisyImagesArray)
 groundTruthArray = torch.from_numpy(groundTruthArray)
 
-subject = 5
-sliceNro = 80
+subject = 1
+sliceNro = 32
 
 def get_activation(name):
     def hook(model, input, output):
         activation[name] = output.detach()
     return hook
 
-model = Unet()
-model.load_state_dict(torch.load('bestModelDataSet3_6'))
+model = UnetWithResidual(1,1)
+modelsPath = path+'/ModeloUnetResidualUno/UnetWithResidual_MSE_lr5e-05_33_best_fit'
+#modelsPath = path+'/ModeloUnetResidualNoNorm/UnetWithResidual_MSE_lr5e-05_22_best_fit'
+model.load_state_dict(torch.load(modelsPath, map_location=torch.device('cpu')))
+#model.load_state_dict(torch.load('bestModelDataSet3_6'))
+
+nameModel = 'UnetWithResidual_MSE_lr5e-05_33_best_fit'
 
 activation = {}
 
-model.Layer1Down.register_forward_hook(get_activation('Layer1Down'))
-model.Layer2Down.register_forward_hook(get_activation('Layer2Down'))
-model.Layer3Down.register_forward_hook(get_activation('Layer3Down'))
-model.Layer4Down.register_forward_hook(get_activation('Layer4Down'))
-model.Layer5Down.register_forward_hook(get_activation('Layer5Down'))
+model.down1.register_forward_hook(get_activation('down1'))
+model.down4.register_forward_hook(get_activation('down4'))
 
-model.Middle.register_forward_hook(get_activation('Middle'))
+model.up4.register_forward_hook(get_activation('up4'))
+model.outc.register_forward_hook(get_activation('outc'))
+model.add_res.register_forward_hook(get_activation('add_res'))
 
-model.Layer1Up.register_forward_hook(get_activation('Layer1Up'))
-model.Layer2Up.register_forward_hook(get_activation('Layer2Up'))
-model.Layer3Up.register_forward_hook(get_activation('Layer3Up'))
-model.Layer4Up.register_forward_hook(get_activation('Layer4Up'))
-model.Layer5Up.register_forward_hook(get_activation('Layer5Up'))
 
 inputsModel = torch.unsqueeze(noisyImagesArray[subject,sliceNro,:,:,:], dim=0)
 output = model(inputsModel)
 
-showSubplots(torch.unsqueeze(activation['Layer1Down'][0,:,:,:], dim=1), 'Layer 1 DOWN')
-showSubplots(torch.unsqueeze(activation['Layer2Down'][0,:,:,:], dim=1), 'Layer 2 DOWN')
-showSubplots(torch.unsqueeze(activation['Layer3Down'][0,:,:,:], dim=1), 'Layer 3 DOWN')
-showSubplots(torch.unsqueeze(activation['Layer4Down'][0,:,:,:], dim=1), 'Layer 4 DOWN')
-showSubplots(torch.unsqueeze(activation['Layer5Down'][0,:,:,:], dim=1), 'Layer 5 DOWN')
+showSubplots(torch.unsqueeze(activation['up4'][0,:,:,:], dim=1), 'LayerUp4_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(torch.unsqueeze(activation['down1'][0,:,:,:], dim=1), 'LayerDown1_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(torch.unsqueeze(activation['down4'][0,:,:,:], dim=1), 'LayerDown4_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(torch.unsqueeze(activation['outc'][0,:,:,:], dim=1), 'LayerOutc_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(torch.unsqueeze(activation['add_res'][0,:,:,:], dim=1), 'LayerAdd_res_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
 
-showSubplots(torch.unsqueeze(activation['Middle'][0,:,:,:], dim=1), 'Middle')
+showSubplots(torch.Tensor.numpy(inputsModel[:,:, :, :]), 'Input_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots((torch.Tensor.numpy(output[:,:, :, :].detach())), 'Output_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
 
-showSubplots(torch.unsqueeze(activation['Layer1Up'][0,:,:,:], dim=1), 'Layer 1 UP')
-showSubplots(torch.unsqueeze(activation['Layer2Up'][0,:,:,:], dim=1), 'Layer 2 UP')
-showSubplots(torch.unsqueeze(activation['Layer3Up'][0,:,:,:], dim=1), 'Layer 3 UP')
-showSubplots(torch.unsqueeze(activation['Layer4Up'][0,:,:,:], dim=1), 'Layer 4 UP')
-showSubplots(torch.unsqueeze(activation['Layer5Up'][0,:,:,:], dim=1), 'Layer 5 UP')
+#model = UnetWithResidual(1,1)
+#modelsPath = path+'/ModeloUnetResidualUno/UnetWithResidual_MSE_lr5e-05_33_best_fit'
+#model.load_state_dict(torch.load(modelsPath, map_location=torch.device('cpu')))
 
-plt.imshow(torch.Tensor.numpy(inputsModel[0,0, :, :]),cmap = 'gray')
-plt.suptitle(f"Input_Subject{subject}_slice{sliceNro}")
-plt.savefig(f"Input_Subject{subject}_slice{sliceNro}.jpg")
-plt.close()
-
-plt.imshow((torch.Tensor.numpy(output[0,0, :, :].detach())),cmap = 'gray')
-plt.suptitle(f"Output_Subject{subject}_slice{sliceNro}")
-plt.savefig(f"Output_Subject{subject}_slice{sliceNro}.jpg")
-plt.close()
-
-modelDT3 = Unet()
-modelDT3.load_state_dict(torch.load('bestModelDataSet3_6'))
+#modelDT3 = Unet()
+#modelDT3.load_state_dict(torch.load('bestModelDataSet3_6'))
 
 # guardo los kernels...
-model_weights = [] # we will save the conv layer weights in this list
-conv_layers_down = [] # we will save the 49 conv layers in this list
-conv_layers_up = []
+#model_weights = [] # we will save the conv layer weights in this list
+#conv_layers_down = [] # we will save the 49 conv layers in this list
+#conv_layers_up = []
 # counter to keep count of the conv layers
-counter = 0
+#counter = 0
 # append all the conv layers and their respective weights to the list
-model_children = list(modelDT3.children())
+#model_children = list(model.children())
 
-for i in range(len(model_children)):
-    if type(model_children[i]) == unetM.DownConv:
-        for j in range(len(model_children[i].DownLayer)):
-            child = model_children[i].DownLayer[j]
-            if type(child) == nn.Conv2d:
-                counter += 1
-                model_weights.append(child.weight)
-                conv_layers_down.append(child)
+#for i in range(len(model_children)):
+    #if type(model_children[i]) == unetM.DownConv:
+    #if type(model_children[i]) == UnetWithResidual.Down:
+        #for j in range(len(model_children[i].DownLayer)):
+        #for j in range(len(model_children[i].conv)):
+            #child = model_children[i].DownLayer[j]
+            #child = model_children[i].conv[j]
+            #if type(child) == nn.Conv2d:
+                #counter += 1
+                #model_weights.append(child.weight)
+                #conv_layers_down.append(child)
 
-    if type(model_children[i]) == unetM.UpConv:
-        for j in range(len(model_children[i].UpConv.DownLayer)):
-            child = model_children[i].UpConv.DownLayer[j]
-            if type(child) == nn.Conv2d:
-                counter += 1
-                model_weights.append(child.weight)
-                conv_layers_up.append(child)
+    #if type(model_children[i]) == unetM.UpConv:
+    #if type(model_children[i]) == UnetWithResidual.Up:
+        #for j in range(len(model_children[i].UpConv.DownLayer)):
+        #for j in range(len(model_children[i].Up.Down)):
+            #child = model_children[i].UpConv.DownLayer[j]
+            #child = model_children[i].Up.Down[j]
+            #if type(child) == nn.Conv2d:
+                #counter += 1
+                #model_weights.append(child.weight)
+                #conv_layers_up.append(child)
 
 
-for n in range(0,len(model_weights)):
-    numLayer = 1+int(n/2)
-    numConv = 0+(n%2)
-    showSubplots(model_weights[n].detach(), f"Kernels_layer{numLayer}_conv{numConv}.png")
+#for n in range(0,len(model_weights)):
+    #numLayer = 1+int(n/2)
+    #numConv = 0+(n%2)
+    #    showSubplots(model_weights[n].detach(), f"Kernels_layer{numLayer}_conv{numConv}.png")
 
 #inputs = torch.unsqueeze(noisyImagesArray[subject,sliceNro,:,:,:], dim=0)
 #results = [conv_layers_down[0](inputs)]
