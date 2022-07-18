@@ -4,7 +4,8 @@ import skimage
 import matplotlib.pyplot as plt
 
 #from unetM import Unet
-from unet import Unet
+#from unet import Unet
+from unet import UnetWithResidual
 from utils import imshow
 from utils import reshapeDataSet
 from utils import MSE
@@ -26,16 +27,16 @@ from sklearn.model_selection import train_test_split
 
 # Testeo todos lo modelos...
 
-model = Unet(1,1)
+model = UnetWithResidual(1,1)
 
 path = os.getcwd()
 
 #modelsPath = path+'/Modelo7'
-modelsPath = path+'/ModeloUnetResidualUno'
+modelsPath = path+'/ModeloUnetResidualNoNorm'
 #modelsPath = path+'/Modelo8'
 models = os.listdir(modelsPath)
 
-pathSaveResults = "C:/Users/Encargado/Desktop/RESULTADOS/UnetResidualUno"
+pathSaveResults = "C:/Users/Encargado/Desktop/RESULTADOS/UnetResidualNoNorm"
 
 pathGroundTruth = path+'/newDataset/groundTruth/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
@@ -55,15 +56,16 @@ noisyImagesArray = []
 greyMaskArray = []
 whiteMaskArray = []
 
-validSubjects = [10,19]
+#validSubjects = [10,19]
 #validSubjects = [8,17]
 #validSubjects = [1,5]
-trainSubjects = [1,2,3,4,5,6,7,8,9,11,12,13,14,15,16,17,18,20]
+validSubjects = [12,4,10,20]
+trainSubjects = [1,2,3,5,6,7,8,9,11,13,14,15,16,17,18,19]
 
 conjunto = 'Train'
 excluirConjunto = validSubjects
 
-nameModel = 'UnetResidualUno'
+nameModel = 'UnetResidualNoNorm'
 
 nameConjunto = []
 
@@ -111,6 +113,7 @@ for element in arrayGroundTruth:
         greyMaskArray.append(greyMask)
         whiteMaskArray.append(whiteMask)
         nameConjunto.append(name)
+
 
 # paso al modelo y evaluo resultados
 noisyImagesArray = np.array(noisyImagesArray)
@@ -281,123 +284,146 @@ for nroModel in models:
         subjectNumbers= nameConjunto[sub]
         subjectName.append(subjectNumbers)
 
-        subjectImages = noisyImagesArray[sub, :, :, :]
-        whiteMaskSubject = whiteMaskArray[sub, :, :, :]
-        greyMaskSubject = greyMaskArray[sub, :, :, :]
-        groundTruthSubject = groundTruthArray[sub,:,:,:]
+        subjectImagesTotal = noisyImagesArray[sub, :, :, :]
+        whiteMaskSubjectTotal = whiteMaskArray[sub, :, :, :]
+        greyMaskSubjectTotal = greyMaskArray[sub, :, :, :]
+        groundTruthSubjectTotal = groundTruthArray[sub,:,:,:]
+
+        subjectImages = []
+        whiteMaskSubject = []
+        greyMaskSubject = []
+        groundTruthSubject = []
+
+        contIdx = 0
 
         print('Subject:',nameConjunto[sub])
 
-        for idx in range(0,len(subjectImages)):
-            subjectSlice.append(idx)
+        idx = 0
 
-            maxSlice = subjectImages[idx,0 ,:, :].max()
+        for contIdx in range(0,len(subjectImagesTotal)):
 
-            if (maxSlice > 0.0):
-                inputsNorm = ((subjectImages[idx]) / maxSlice)
-            else:
-                inputsNorm = ((subjectImages[idx]))
+            subjectSlice.append(contIdx)
 
-            outModel = testModelSlice(model, inputsNorm)
+            maxSlice = subjectImagesTotal[contIdx,0 ,:, :].max()
+            maxSliceGroundTruth = groundTruthSubjectTotal[contIdx,0 ,:, :].max()
 
-            if (maxSlice > 0.0):
-                outModelNp = torchToNp((outModel * maxSlice))
-            else:
-                outModelNp = torchToNp((outModel *maxSlice))
+            if (maxSlice > 0.0000001) and (maxSliceGroundTruth > 0.0):
 
-            inputsNp.append(torchToNp(subjectImages[idx]))
-            groundTruthNp.append(torchToNp(groundTruthSubject[idx]))
-            outNp.append(outModelNp[0, :, :, :])
+                subjectImages.append(subjectImagesTotal [idx, :, :, :])
+                whiteMaskSubject.append(whiteMaskSubjectTotal[idx, :, :, :])
+                greyMaskSubject.append(greyMaskSubjectTotal[idx, :, :, :])
+                groundTruthSubject.append(groundTruthSubjectTotal[idx, :, :, :])
 
-            outFilterSigma4.append(skimage.filters.gaussian(subjectImages[idx,0 ,:, :], sigma=(2 / 2.35)))
-            crcSliceDspSigma4.append(crcValue(torch.from_numpy(outFilterSigma4[-1]), greyMaskSubject[idx,0,:,:], whiteMaskSubject[idx,0,:,:]))
-            covSliceDspSigma4.append(covValue(torch.from_numpy(outFilterSigma4[-1]), greyMaskSubject[idx,0,:,:]))
+                inputsNorm = subjectImagesTotal[idx]
+                #if (maxSlice > 0.0):
+                #    inputsNorm = ((subjectImages[idx]) / maxSlice)
+                #else:
+                #    inputsNorm = ((subjectImages[idx]))
 
-            outFilterSigma6.append(skimage.filters.gaussian(subjectImages[idx, 0, :, :], sigma=(3 / 2.35)))
-            crcSliceDspSigma6.append(crcValue(torch.from_numpy(outFilterSigma6[-1]), greyMaskSubject[idx, 0, :, :],
-                                              whiteMaskSubject[idx, 0, :, :]))
-            covSliceDspSigma6.append(covValue(torch.from_numpy(outFilterSigma6[-1]), greyMaskSubject[idx, 0, :, :]))
+                outModel = testModelSlice(model, inputsNorm)
 
-            outFilterSigma8.append(skimage.filters.gaussian(subjectImages[idx,0 ,:, :], sigma=(4/2.35)))
-            crcSliceDspSigma8.append(crcValue(torch.from_numpy(outFilterSigma8[-1]), greyMaskSubject[idx,0,:,:], whiteMaskSubject[idx,0,:,:]))
-            covSliceDspSigma8.append(covValue(torch.from_numpy(outFilterSigma8[-1]), greyMaskSubject[idx,0,:,:]))
+                outModelNp = torchToNp(outModel)
 
-            covAntesSlice.append(covValue(subjectImages[idx,0,:,:], greyMaskSubject[idx,0,:,:]))
-            crcAntesSlice.append(crcValue(subjectImages[idx,0,:,:], greyMaskSubject[idx,0,:,:], whiteMaskSubject[idx,0,:,:]))
+                #if (maxSlice > 0.0):
+                #    outModelNp = torchToNp((outModel * maxSlice))
+                #else:
+                #    outModelNp = torchToNp((outModel *maxSlice))
 
-            covDspSlice.append(covValue(torch.from_numpy(np.array(outNp)[idx, 0, 0,:, :]), greyMaskSubject[idx,0,:,:]))
-            crcDspSlice.append(crcValue(torch.from_numpy(np.array(outNp)[idx, 0, 0,:, :]), greyMaskSubject[idx,0,:,:],whiteMaskSubject[idx,0,:,:]))
+                inputsNp.append(torchToNp(subjectImages[-1]))
+                groundTruthNp.append(torchToNp(groundTruthSubject[-1]))
+                outNp.append(outModelNp[0, :, :, :])
 
-            calcularMean = ((torch.Tensor.numpy(subjectImages)[idx,0,:,:]) * torch.Tensor.numpy(greyMaskSubject[idx,0,:,:])).flatten()
-            calcularMean = calcularMean[calcularMean != 0.0]
-            meanValueAntesSlice.append(np.mean(calcularMean))
-            calcularMean = ((np.array(outNp)[idx,0,0,:,:]) * torch.Tensor.numpy(greyMaskSubject[idx,0,:,:])).flatten()
-            calcularMean = calcularMean[calcularMean != 0.0]
-            meanValueDspSlice.append(np.mean(calcularMean))
-            calcularMean = (((np.array(outFilterSigma4)[idx,:,:]) * torch.Tensor.numpy(greyMaskSubject[idx,0,:,:])).flatten())
-            calcularMean = calcularMean[calcularMean != 0.0]
-            meanValueSigma4Slice.append(np.mean(calcularMean))
-            calcularMean = ((((np.array(outFilterSigma6)[idx, :, :]) * torch.Tensor.numpy(greyMaskSubject[idx,0,:,:])).flatten()))
-            calcularMean = calcularMean[calcularMean != 0.0]
-            meanValueSigma6Slice.append(np.mean(calcularMean))
-            calcularMean = ((((np.array(outFilterSigma8)[idx, :, :]) * torch.Tensor.numpy(greyMaskSubject[idx, 0, :, :])).flatten()))
-            calcularMean = calcularMean[calcularMean != 0.0]
-            meanValueSigma8Slice.append(np.mean(calcularMean))
+                outFilterSigma4.append(skimage.filters.gaussian(subjectImages[idx][0,:,:], sigma=(2 / 2.35)))
+                crcSliceDspSigma4.append(crcValue(torch.from_numpy(outFilterSigma4[idx]), greyMaskSubject[idx][0,:,:], greyMaskSubject[idx][0,:,:]))
+                covSliceDspSigma4.append(covValue(torch.from_numpy(outFilterSigma4[idx]), greyMaskSubject[idx][0,:,:]))
 
-            mseValueSliceAntes.append(MSE(torch.Tensor.numpy(subjectImages[idx, 0, :, :]), torch.Tensor.numpy(groundTruthSubject[idx, 0, :, :]),cantPixels = 256*256))
-            mseValueSliceDsp.append(MSE((np.array(outNp))[idx, 0, 0, :, :], torch.Tensor.numpy(groundTruthSubject[idx, 0, :, :]), cantPixels = 256*256))
-            mseValueSliceSigma4.append(MSE((np.array(outFilterSigma4))[idx, :, :], torch.Tensor.numpy(groundTruthSubject[idx, 0, :, :]), cantPixels = 256*256))
-            mseValueSliceSigma6.append(MSE((np.array(outFilterSigma6))[idx, :, :], torch.Tensor.numpy(groundTruthSubject[idx, 0, :, :]), cantPixels = 256*256))
-            mseValueSliceSigma8.append(MSE((np.array(outFilterSigma8))[idx, :, :], torch.Tensor.numpy(groundTruthSubject[idx, 0, :, :]),cantPixels=256 * 256))
+                outFilterSigma6.append(skimage.filters.gaussian(subjectImages[idx][0,:,:], sigma=(3 / 2.35)))
+                crcSliceDspSigma6.append(crcValue(torch.from_numpy(outFilterSigma6[idx]), greyMaskSubject[idx][0,:,:],whiteMaskSubject[idx][0,:,:]))
+                covSliceDspSigma6.append(covValue(torch.from_numpy(outFilterSigma6[idx]), greyMaskSubject[idx][0,:,:]))
 
-            subjectTotal.append(subjectNumbers)
+                outFilterSigma8.append(skimage.filters.gaussian(subjectImages[idx][0,:,:], sigma=(4/2.35)))
+                crcSliceDspSigma8.append(crcValue(torch.from_numpy(outFilterSigma8[idx]), greyMaskSubject[idx][0,:,:], whiteMaskSubject[idx][0,:,:]))
+                covSliceDspSigma8.append(covValue(torch.from_numpy(outFilterSigma8[idx]), greyMaskSubject[idx][0,:,:]))
 
-        calcularMean = (((torch.Tensor.numpy(subjectImages)[:,0,:,:]) * torch.Tensor.numpy(greyMaskSubject)[:,0,:,:]).flatten())
+                covAntesSlice.append(covValue(subjectImages[idx][0,:,:], greyMaskSubject[idx][0,:,:]))
+                crcAntesSlice.append(crcValue(subjectImages[idx][0,:,:], greyMaskSubject[idx][0,:,:], whiteMaskSubject[idx][0,:,:]))
+
+                covDspSlice.append(covValue(torch.from_numpy(np.array(outNp)[idx, 0, 0,:, :]), greyMaskSubject[idx][0,:,:]))
+                crcDspSlice.append(crcValue(torch.from_numpy(np.array(outNp)[idx, 0, 0,:, :]), greyMaskSubject[idx][0,:,:],whiteMaskSubject[idx][0,:,:]))
+
+                calcularMean = (np.array(subjectImages[idx][0,:,:]) * torch.Tensor.numpy(greyMaskSubject[idx][0,:,:])).flatten()
+                calcularMean = calcularMean[calcularMean != 0.0]
+                meanValueAntesSlice.append(np.mean((calcularMean)))
+                calcularMean = ((np.array(outNp)[idx,0,0,:,:]) * torch.Tensor.numpy(greyMaskSubject[idx][0,:,:])).flatten()
+                calcularMean = calcularMean[calcularMean != 0.0]
+                meanValueDspSlice.append(np.mean(calcularMean))
+                calcularMean = (((np.array(outFilterSigma4)[idx]) * torch.Tensor.numpy(greyMaskSubject[idx][0,:,:])).flatten())
+                calcularMean = calcularMean[calcularMean != 0.0]
+                meanValueSigma4Slice.append(np.mean(calcularMean))
+                calcularMean = ((((np.array(outFilterSigma6)[idx]) * torch.Tensor.numpy(greyMaskSubject[idx][0,:,:])).flatten()))
+                calcularMean = calcularMean[calcularMean != 0.0]
+                meanValueSigma6Slice.append(np.mean(calcularMean))
+                calcularMean = ((((np.array(outFilterSigma8)[idx]) * torch.Tensor.numpy(greyMaskSubject[idx][0,:,:])).flatten()))
+                calcularMean = calcularMean[calcularMean != 0.0]
+                meanValueSigma8Slice.append(np.mean(calcularMean))
+
+                mseValueSliceAntes.append(MSE(np.array(subjectImages[idx][0,:,:]), torch.Tensor.numpy(groundTruthSubject[idx][0,:,:]),cantPixels = 256*256))
+                mseValueSliceDsp.append(MSE((np.array(outNp))[idx, 0, 0, :, :], torch.Tensor.numpy(groundTruthSubject[idx][0,:,:]), cantPixels = 256*256))
+                mseValueSliceSigma4.append(MSE((np.array(outFilterSigma4))[idx], torch.Tensor.numpy(groundTruthSubject[idx][0,:,:]), cantPixels = 256*256))
+                mseValueSliceSigma6.append(MSE((np.array(outFilterSigma6))[idx], torch.Tensor.numpy(groundTruthSubject[idx][0,:,:]), cantPixels = 256*256))
+                mseValueSliceSigma8.append(MSE((np.array(outFilterSigma8))[idx], torch.Tensor.numpy(groundTruthSubject[idx][0,:,:]),cantPixels=256 * 256))
+
+                subjectTotal.append(subjectNumbers)
+                idx = idx + 1
+
+        calcularMean = ((torch.Tensor.numpy((torch.cat(subjectImages)) * (torch.Tensor.numpy(torch.cat(greyMaskSubject)))).flatten()))
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueAntes.append(np.mean(calcularMean))
         stdValueAntes.append(np.std(calcularMean))
 
-        calcularMean = (((np.array(outNp)[:,0,0,:,:]) * torch.Tensor.numpy(greyMaskSubject)[:,0,:,:]).flatten())
+        calcularMean = (((np.array(outNp)[:,0,0,:,:]) * (torch.Tensor.numpy(torch.cat(greyMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueDsp.append(np.mean(calcularMean))
         stdValueDsp.append(np.std(calcularMean))
 
-        calcularMean = (((np.array(outFilterSigma4)[:,:,:]) * torch.Tensor.numpy(greyMaskSubject)[:,0,:,:]).flatten())
+        calcularMean = (((np.array(outFilterSigma4)[:,:,:]) * (torch.Tensor.numpy(torch.cat(greyMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueSigma4.append(np.mean(calcularMean))
         stdValueSigma4.append(np.std(calcularMean))
 
-        calcularMean = (((np.array(outFilterSigma6)[:,  :, :]) * torch.Tensor.numpy(greyMaskSubject)[:,0,:,:]).flatten())
+        calcularMean = (((np.array(outFilterSigma6)[:,  :, :]) * (torch.Tensor.numpy(torch.cat(greyMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueSigma6.append(np.mean(calcularMean))
         stdValueSigma6.append(np.std(calcularMean))
 
-        calcularMean = (((np.array(outFilterSigma8)[:, :, :]) * torch.Tensor.numpy(greyMaskSubject)[:, 0, :, :]).flatten())
+        calcularMean = (((np.array(outFilterSigma8)[:, :, :]) * (torch.Tensor.numpy(torch.cat(greyMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueSigma8.append(np.mean(calcularMean))
         stdValueSigma8.append(np.std(calcularMean))
 
-        calcularMean = (((torch.Tensor.numpy(subjectImages)[:, 0, :, :]) * torch.Tensor.numpy(whiteMaskSubject)[:, 0, :,:]).flatten())
+
+        calcularMean = ((torch.Tensor.numpy((torch.cat(subjectImages)) * (torch.Tensor.numpy(torch.cat(whiteMaskSubject)))).flatten()))
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueAntesWhiteMatter.append(np.mean(calcularMean))
 
-        calcularMean = (((np.array(outNp)[:, 0, 0, :, :]) * torch.Tensor.numpy(whiteMaskSubject)[:, 0, :, :]).flatten())
+        calcularMean = (((np.array(outNp)[:, 0, 0, :, :]) * (torch.Tensor.numpy(torch.cat(whiteMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueDspWhiteMatter.append(np.mean(calcularMean))
 
-        calcularMean = (((np.array(outFilterSigma4)[:, :, :]) * torch.Tensor.numpy(whiteMaskSubject)[:, 0, :, :]).flatten())
+        calcularMean = (((np.array(outFilterSigma4)[:, :, :]) * (torch.Tensor.numpy(torch.cat(whiteMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueSigma4WhiteMatter.append(np.mean(calcularMean))
 
-        calcularMean = (((np.array(outFilterSigma6)[:, :, :]) * torch.Tensor.numpy(whiteMaskSubject)[:, 0, :, :]).flatten())
+        calcularMean = (((np.array(outFilterSigma6)[:, :, :]) * (torch.Tensor.numpy(torch.cat(whiteMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueSigma6WhiteMatter.append(np.mean(calcularMean))
 
-        calcularMean = (((np.array(outFilterSigma8)[:, :, :]) * torch.Tensor.numpy(whiteMaskSubject)[:, 0, :, :]).flatten())
+        calcularMean = (((np.array(outFilterSigma8)[:, :, :]) * (torch.Tensor.numpy(torch.cat(whiteMaskSubject)))).flatten())
         calcularMean = calcularMean[calcularMean != 0.0]
         meanValueSigma8WhiteMatter.append(np.mean(calcularMean))
 
-        mseValueAntes.append(MSE(torch.Tensor.numpy(subjectImages[:,0,:,:]),torch.Tensor.numpy(groundTruthSubject[:,0,:,:])))
+
+        mseValueAntes.append(MSE((torch.Tensor.numpy((torch.cat(subjectImages)),torch.Tensor.numpy(groundTruthSubject[:,0,:,:])))))
         mseValueDsp.append(MSE((np.array(outNp))[:, 0, 0, :, :], torch.Tensor.numpy(groundTruthSubject[:, 0, :, :])))
         mseValueSigma4.append(MSE((np.array(outFilterSigma4))[:,:,:], torch.Tensor.numpy(groundTruthSubject[:, 0, :, :])))
         mseValueSigma6.append(MSE((np.array(outFilterSigma6))[:,:, :], torch.Tensor.numpy(groundTruthSubject[:, 0, :, :])))
@@ -431,35 +457,35 @@ for nroModel in models:
 
         voxelSize = groundTruthImg.GetSpacing()
 
-        image = sitk.GetImageFromArray(np.array(inputsNp)[:, 0, 0, :, :])
-        image.SetSpacing(voxelSize)
-        nameImage = 'Subject' + subjectNumbers + 'Input5%'+nroModel+'.nii'
-        save_path = os.path.join(pathSaveResults, nameImage)
-        sitk.WriteImage(image, save_path)
+        #image = sitk.GetImageFromArray(np.array(inputsNp)[:, 0, 0, :, :])
+        #image.SetSpacing(voxelSize)
+        #nameImage = 'Subject' + subjectNumbers + 'Input5%'+nroModel+'.nii'
+        #save_path = os.path.join(pathSaveResults, nameImage)
+        #sitk.WriteImage(image, save_path)
 
-        image = sitk.GetImageFromArray(np.array(outNp)[:, 0,0, :, :])
-        image.SetSpacing(voxelSize)
-        nameImage = 'Subject' + subjectNumbers + 'Outpu5%'+nroModel+'.nii'
-        save_path = os.path.join(pathSaveResults, nameImage)
-        sitk.WriteImage(image, save_path)
+        #image = sitk.GetImageFromArray(np.array(outNp)[:, 0,0, :, :])
+        #image.SetSpacing(voxelSize)
+        #nameImage = 'Subject' + subjectNumbers + 'Outpu5%'+nroModel+'.nii'
+        #save_path = os.path.join(pathSaveResults, nameImage)
+        #sitk.WriteImage(image, save_path)
 
-        image = sitk.GetImageFromArray(np.array(outFilterSigma4)[:, :, :])
-        image.SetSpacing(voxelSize)
-        nameImage = 'Subject' + subjectNumbers + 'FilterSigma4-5%'+nroModel+'.nii'
-        save_path = os.path.join(pathSaveResults, nameImage)
-        sitk.WriteImage(image, save_path)
+        #image = sitk.GetImageFromArray(np.array(outFilterSigma4)[:, :, :])
+        #image.SetSpacing(voxelSize)
+        #nameImage = 'Subject' + subjectNumbers + 'FilterSigma4-5%'+nroModel+'.nii'
+        #save_path = os.path.join(pathSaveResults, nameImage)
+        #sitk.WriteImage(image, save_path)
 
-        image = sitk.GetImageFromArray(np.array(outFilterSigma6)[:, :, :])
-        image.SetSpacing(voxelSize)
-        nameImage = 'Subject' + subjectNumbers + 'FilterSigma6-5%'+nroModel+'.nii'
-        save_path = os.path.join(pathSaveResults, nameImage)
-        sitk.WriteImage(image, save_path)
+        #image = sitk.GetImageFromArray(np.array(outFilterSigma6)[:, :, :])
+        #image.SetSpacing(voxelSize)
+        #nameImage = 'Subject' + subjectNumbers + 'FilterSigma6-5%'+nroModel+'.nii'
+        #save_path = os.path.join(pathSaveResults, nameImage)
+        #sitk.WriteImage(image, save_path)
 
-        image = sitk.GetImageFromArray(np.array(outFilterSigma8)[:, :, :])
-        image.SetSpacing(voxelSize)
-        nameImage = 'Subject' + subjectNumbers + 'FilterSigma8-5%'+nroModel+'.nii'
-        save_path = os.path.join(pathSaveResults, nameImage)
-        sitk.WriteImage(image, save_path)
+        #image = sitk.GetImageFromArray(np.array(outFilterSigma8)[:, :, :])
+        #image.SetSpacing(voxelSize)
+        #nameImage = 'Subject' + subjectNumbers + 'FilterSigma8-5%'+nroModel+'.nii'
+        #save_path = os.path.join(pathSaveResults, nameImage)
+        #sitk.WriteImage(image, save_path)
 
         ## Guardar en Excel
         dfGlobal = pd.DataFrame()
