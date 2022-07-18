@@ -11,7 +11,7 @@
 % an attenuation map.
 % Calling example: [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, refImage] = createPETPhantomFromBrainweb('subject43_crisp_v.rawb', [344 344 127], [2.08625 2.08625 2.03125]);
 
-function [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, refImage] = createPETPhantomFromBrainweb(binaryFilename, imageSize_pixels, pixelSize_mm)
+function [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(binaryFilename, imageSize_pixels, pixelSize_mm)
 %% PARAMETERS
 imageSizePhantom_pixels = [362 434 362];
 pixelSizePhantom_mm = [0.5 0.5 0.5];
@@ -39,8 +39,8 @@ classified_tissue = phantom;%round(phantom./16);
 %% PHANTOM PARAMETER
 
 indicesCsf = phantom == 1;
-indicesWhiteMatter = phantom == 3;
-indicesGrayMatter = phantom == 2;
+maskWhiteMatter = phantom == 3;
+maskGrayMatter = phantom == 2;
 indicesFat = phantom == 4;
 indicesMuscle = phantom == 5;
 indicesMuscleSkin = phantom == 6;
@@ -67,10 +67,10 @@ whiteMatterAct = 32;
 grayMatterAct = 128;
 skinAct = 16;
 pet = phantom;
-pet(indicesWhiteMatter) = whiteMatterAct;
-pet(indicesGrayMatter) = grayMatterAct;
+pet(maskWhiteMatter) = whiteMatterAct;
+pet(maskGrayMatter) = grayMatterAct;
 pet(indicesMuscleSkin) = skinAct;
-pet(~indicesWhiteMatter & ~indicesGrayMatter & ~indicesMuscleSkin) = 0;
+pet(~maskWhiteMatter & ~maskGrayMatter & ~indicesMuscleSkin) = 0;
 refImage = imref3d(imageSize_pixels, pixelSize_mm(2), pixelSize_mm(1), pixelSize_mm(3));
 
 %% T1
@@ -82,10 +82,10 @@ skullT1 = 48;
 marrowT1 = 180;
 duraT1 = 48;
 csfT2 = 48;
-t1(indicesWhiteMatter) = whiteMatterT1;
-t1(indicesGrayMatter) = grayMatterT1;
+t1(maskWhiteMatter) = whiteMatterT1;
+t1(maskGrayMatter) = grayMatterT1;
 t1(indicesMuscleSkin) = skinT1;
-t1(~indicesWhiteMatter & ~indicesGrayMatter & ~indicesMuscleSkin & ~indicesBone) = 0;
+t1(~maskWhiteMatter & ~maskGrayMatter & ~indicesMuscleSkin & ~indicesBone) = 0;
 t1(indicesSkull) = skullT1;
 t1(indicesMarrow) = marrowT1;
 t1(indicesBone) = duraT1;
@@ -99,10 +99,10 @@ skullT2 = 100;
 marrowT2 = 250;
 csfT2 = 250;
 duraT2 = 200;
-t2(indicesWhiteMatter) = whiteMatterT2;
-t2(indicesGrayMatter) = grayMatterT2;
+t2(maskWhiteMatter) = whiteMatterT2;
+t2(maskGrayMatter) = grayMatterT2;
 t2(indicesMuscleSkin) = skinT2;
-t2(~indicesWhiteMatter & ~indicesGrayMatter & ~indicesMuscleSkin & ~indicesBone) = 0;
+t2(~maskWhiteMatter & ~maskGrayMatter & ~indicesMuscleSkin & ~indicesBone) = 0;
 t2(indicesCsf) = csfT2;
 t2(indicesSkull) = skullT2;
 t2(indicesMarrow) = marrowT2;
@@ -133,12 +133,19 @@ if pixelSize_mm ~= pixelSizePhantom_mm | imageSize_pixels ~= imageSizePhantom_pi
     t2_rescaled(isnan(t2_rescaled)) = 0;
     classified_tissue_rescaled = interp3(Xphantom,Yphantom,Zphantom,classified_tissue,Xpet,Ypet,Zpet, 'nearest'); 
     classified_tissue_rescaled(isnan(classified_tissue_rescaled)) = 0;
+    maskWhiteMatter = interp3(Xphantom,Yphantom,Zphantom,uint8(maskWhiteMatter),Xpet,Ypet,Zpet, 'nearest'); 
+    maskWhiteMatter(isnan(maskWhiteMatter)) = 0;
+    maskGrayMatter = interp3(Xphantom,Yphantom,Zphantom,uint8(maskGrayMatter),Xpet,Ypet,Zpet, 'nearest'); 
+    maskGrayMatter(isnan(maskGrayMatter)) = 0;
+
     % I am having problems with the first slices, zero padd them:
     pet_rescaled(:,:,1:5) = 0;
     mumap_rescaled(:,:,1:5) = 0;
     t1_rescaled(:,:,1:5) = 0;
     t2_rescaled(:,:,1:5) = 0;
     classified_tissue_rescaled(:,:,1:5) = 0;
+    maskGrayMatter(:,:,1:5) = 0;
+    maskWhiteMatter(:,:,1:5) = 0;
 else
     pet_rescaled = pet;
     mumap_rescaled = mumap;
