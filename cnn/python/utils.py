@@ -55,6 +55,8 @@ def showSubplots(img, title):
     cols = cantImages
     img_count = 0
     fig, axes = plt.subplots(nrows=cantImages, ncols=cantImages)
+    if cantImages == 1:
+        axes = np.array(axes)
     for ax in axes.flat:
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
@@ -81,7 +83,7 @@ def MSE(img1, img2, cantPixels = None):
     error = suma / cantPix
     return error
 
-def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, device, pre_trained = False, save = True, saveInterval_epochs = 5, name = None,
+def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, device, pre_trained = False, save = True, saveInterval_epochs = 5, outputPath = './', name = 'Net',
                printStep_batches = math.inf, plotStep_batches = math.inf, printStep_epochs = 1, plotStep_epochs = 1):
     # defino batches
     # Return
@@ -181,7 +183,7 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
                 axs_batches[2].set_title('Ground Truth')
                 plt.draw()
                 plt.pause(0.0001)
-                plt.savefig(name + '_training_batch_{0}_epoch_{1}.png'.format(i, epoch))
+                plt.savefig(outputPath + name + '_training_batch_{0}_epoch_{1}.png'.format(i, epoch))
 
         lossValueTrainingSetAllEpoch.append(np.mean(lossValuesTrainingSetEpoch))
         model.train(False)
@@ -224,34 +226,34 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             axs_epochs[3].set_title('Ground Truth')
             plt.draw()
             plt.pause(0.0001)
-            plt.savefig(name + '_training_epoch_{0}.png'.format(epoch))
+            plt.savefig(outputPath + name + '_training_epoch_{0}.png'.format(epoch))
 
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = name + '_{}_{}_best_fit'.format(timestamp, epoch)
+            model_path = outputPath + name + '_{}_{}_best_fit'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
         if (i % printStep_epochs) == (printStep_epochs - 1):
             print('[Epoch {0}. Time: {1}.]. Training loss: {2}. Validation loss: {3}'.format(epoch, datetime.now(),lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
         if (save == True) and (epoch%saveInterval_epochs == 0):
-            model_path = name + '_{}_{}'.format(timestamp, epoch)
+            model_path = outputPath + name + '_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
-            nameArch = name + '_lossValuesTrainingSetBatch_{0}'.format(epoch) + '.xlsx'
+            nameArch = outputPath + name + '_lossValuesTrainingSetBatch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValuesTrainingSet)
             df.to_excel(nameArch)
 
-            nameArch = name + '_lossValuesTrainingSetEpoch_{0}'.format(epoch) + '.xlsx'
+            nameArch = outputPath + name + '_lossValuesTrainingSetEpoch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValueTrainingSetAllEpoch)
             df.to_excel(nameArch)
 
-            nameArch = name + '_lossValuesDevSetBatch_{0}'.format(epoch) + '.xlsx'
+            nameArch = outputPath + name + '_lossValuesDevSetBatch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValuesDevSet)
             df.to_excel(nameArch)
 
-            nameArch = name + '_lossValuesDevSetEpoch_{0}'.format(epoch) + '.xlsx'
+            nameArch = outputPath + name + '_lossValuesDevSetEpoch_{0}'.format(epoch) + '.xlsx'
             df = pd.DataFrame(lossValuesDevSetAllEpoch)
             df.to_excel(nameArch)
 
