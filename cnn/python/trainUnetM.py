@@ -31,17 +31,28 @@ print(device)
 batchSize = 8
 epochs = 100
 learning_rate=0.00005
+normalizeInput = False
+nameThisNet = 'UnetWithResidual_MSE_lr{0}_AlignTrue'.format(learning_rate)
+if normalizeInput:
+    nameThisNet = nameThisNet + '_norm'
+
+outputPath = '../../../Results/' + nameThisNet + './'
+if not os.path.exists(outputPath):
+    os.makedirs(outputPath)
 
 # Importo base de datos ...
-path = os.getcwd() #
+path = os.getcwd() + '/' #
 path = 'D:/UNSAM/PET/BrainWebSimulations/'
+lowDose_perc = 5
+actScaleFactor = 100/lowDose_perc
+
 pathGroundTruth = path+'/100'
 #pathGroundTruth = path+'/NewDataset/groundTruth/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 trainGroundTruth = []
 validGroundTruth = []
 
-pathNoisyDataSet = path+'/5'
+pathNoisyDataSet = path + str(lowDose_perc)
 #pathNoisyDataSet = path+'/NewDataset/noisyDataSet/5'
 arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
 trainNoisyDataSet = []
@@ -49,10 +60,14 @@ validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
 #unet = Unet()
-unet = Unet(1, 1)
+#unet = Unet(1, 1)
 unet = UnetWithResidual(1, 1)
 
-ramdomIdx = np.random.randint(1, len(arrayGroundTruth)+1, 2).tolist()
+rng = np.random.default_rng()
+#ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)
+#ramdomIdx = np.random.randint(1, len(arrayGroundTruth)+1, 4).tolist()
+# Fixed validation phantoms:
+ramdomIdx = [2, 4, 6, 8]
 print(ramdomIdx)
 
 nameGroundTruth = []
@@ -106,11 +121,16 @@ for subject in range(0, len(trainNoisyDataSet)):
         maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
         maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
         if (maxSliceNoisy > 0.0000001) and (maxSliceGroundTruth > 0.0) :
-            normNoisy = ((subjectElementNoisy[slice, :, :]) / maxSliceNoisy)
+            normNoisy = ((subjectElementNoisy[slice, :, :]) )*actScaleFactor # This factor scales up the activity to the full dose values
+            normGroundTruth = ((subjectElementGroundTruth[slice, :, :]))
+            maxSliceNoisy = normNoisy.max()
+            maxSliceGroundTruth = normGroundTruth.max()
+            if normalizeInput:
+                normNoisy = normNoisy / maxSliceNoisy
+                normGroundTruth = normGroundTruth / maxSliceNoisy # normalize by the input not by the groundtruth, maxSliceGroundTruth
             trainNoisyDataSetNorm.append(normNoisy)
             trainNoisyDataSetNorm.append(np.rot90(normNoisy))
             trainNoisyDataSetNorm.append(rotate(normNoisy, angle=45, reshape=False))
-            normGroundTruth = ((subjectElementGroundTruth[slice, :, :]) / maxSliceGroundTruth)
             trainGroundTruthNorm.append(normGroundTruth )
             trainGroundTruthNorm.append(np.rot90(normGroundTruth))
             trainGroundTruthNorm.append(rotate(normGroundTruth, angle=45, reshape=False))
@@ -125,11 +145,16 @@ for subject in range(0, len(validNoisyDataSet)):
         maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
         maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
         if (maxSliceNoisy > 0.0000001) and (maxSliceGroundTruth > 0.0) :
-            normNoisy = ((subjectElementNoisy[slice, :, :]) / maxSliceNoisy)
+            normNoisy = ((subjectElementNoisy[slice, :, :]) )*actScaleFactor # This factor scales up the activity to the full dose values
+            normGroundTruth = ((subjectElementGroundTruth[slice, :, :]))
+            maxSliceNoisy = normNoisy.max()
+            maxSliceGroundTruth = normGroundTruth.max()
+            if normalizeInput:
+                normNoisy = normNoisy / maxSliceNoisy
+                normGroundTruth = normGroundTruth / maxSliceNoisy
             validNoisyDataSetNorm.append(normNoisy)
             validNoisyDataSetNorm.append(np.rot90(normNoisy))
             validNoisyDataSetNorm.append(rotate(normNoisy, angle=45, reshape=False))
-            normGroundTruth = ((subjectElementGroundTruth[slice, :, :]) / maxSliceGroundTruth)
             validGroundTruthNorm.append(normGroundTruth)
             validGroundTruthNorm.append(np.rot90(normGroundTruth))
             validGroundTruthNorm.append(rotate(normGroundTruth, angle=45, reshape=False))
@@ -173,7 +198,7 @@ optimizer = optim.Adam(unet.parameters(), lr=learning_rate)
 
 
 lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer, batchSize,
-                                                                                            epochs, device, save = True, name = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate),
+                                                                                            epochs, device, save = True, outputPath=outputPath,name = nameThisNet,
                                                                                             printStep_epochs = 1, plotStep_epochs = 1)
 
 df = pd.DataFrame(lossValuesTraining)

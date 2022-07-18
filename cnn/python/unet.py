@@ -49,7 +49,7 @@ class Up(nn.Module):
         if bilinear:
             self.up = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
         else:
-            self.up = nn.ConvTranspose2d(in_ch // 2, in_ch // 2, 2, stride=2)
+            self.up = nn.ConvTranspose2d(in_ch // 2, in_ch // 2, kernel_size=2, stride=2)
 
         self.conv = DoubleConv(in_ch, out_ch)
 
@@ -78,9 +78,11 @@ class OutConv(nn.Module):
 class AddResidual(nn.Module):
     def __init__(self):
         super(AddResidual, self).__init__()
-
+        self.relu = nn.ReLU(inplace=True)
     def forward(self, x, residual):
         x = x + residual
+        # Image has only positive values:
+        x = self.relu(x)
         return x
 
 class Unet(nn.Module):
@@ -89,16 +91,16 @@ class Unet(nn.Module):
         self.n_channels = in_channels
         self.n_classes =  classes
 
-        self.inc = InConv(in_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        self.down4 = Down(512, 512)
-        self.up1 = Up(1024, 256)
-        self.up2 = Up(512, 128)
-        self.up3 = Up(256, 64)
-        self.up4 = Up(128, 64)
-        self.outc = OutConv(64, classes)
+        self.inc = InConv(in_channels, 16)
+        self.down1 = Down(16, 32)
+        self.down2 = Down(32, 64)
+        self.down3 = Down(64, 128)
+        self.down4 = Down(128, 256)
+        self.up1 = Up(256+128, 128)
+        self.up2 = Up(128+64, 64)
+        self.up3 = Up(64+32, 32)
+        self.up4 = Up(32+16, 16)
+        self.outc = OutConv(16, classes)
 
     def forward(self, x):
         x1 = self.inc(x)
@@ -119,16 +121,16 @@ class UnetWithResidual(nn.Module):
         self.n_channels = in_channels
         self.n_classes =  out_channels
 
-        self.inc = InConv(in_channels, 64)
-        self.down1 = Down(64, 128)
-        self.down2 = Down(128, 256)
-        self.down3 = Down(256, 512)
-        self.down4 = Down(512, 512)
-        self.up1 = Up(1024, 256)
-        self.up2 = Up(512, 128)
-        self.up3 = Up(256, 64)
-        self.up4 = Up(128, 64)
-        self.outc = OutConv(64, out_channels)
+        self.inc = InConv(in_channels, 16)
+        self.down1 = Down(16, 32)
+        self.down2 = Down(32, 64)
+        self.down3 = Down(64, 128)
+        self.down4 = Down(128, 256)
+        self.up1 = Up(256 + 128, 128)
+        self.up2 = Up(128 + 64, 64)
+        self.up3 = Up(64 + 32, 32)
+        self.up4 = Up(32 + 16, 16)
+        self.outc = OutConv(16, 1)
         self.add_res = AddResidual()
 
     def forward(self, x):
