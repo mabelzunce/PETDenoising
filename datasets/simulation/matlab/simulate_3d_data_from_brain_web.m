@@ -43,24 +43,28 @@ imgDir = dir ([brainWebPath]);
 
 for i = 3:length(imgDir)
     n = i-2;
-    [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), [344 344 127], [2.08625 2.08625 2.03125]);
+    [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), [344 344 127], [2.08625 2.08625 2.03125]);
 
     pet_rescaled_all_images{n} = single(pet_rescaled);
     mumap_rescaled_rescaled_all_images{n} = single(mumap_rescaled);
     t1_rescaled_all_images{n} =  single(t1_rescaled);
     t2_rescaled_all_images{n} =  single(t2_rescaled);
-    classified_tissue_rescaled_all_images{n} =  single(classified_tissue_rescaled);
+    classified_tissue_rescaled_all_images{n} =  uint8(classified_tissue_rescaled);
     refImage_all_images{n} = refImage;
     if n == 1
         niftiwrite(pet_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_pet', n)], 'Compressed', 1);
         info = niftiinfo([outputPath sprintf('Phantom_%d_pet', n)]);
         info.PixelDimensions = PET.image_size.voxelSize_mm;
     end
+    info.Datatype = 'single';
     niftiwriteresorted(pet_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_pet', n)], info, 1);
     niftiwriteresorted(mumap_rescaled_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_mumap', n)], info, 1);
     niftiwriteresorted(t1_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_t1', n)], info, 1);
     niftiwriteresorted(t2_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_t2', n)], info, 1);
-    niftiwriteresorted(classified_tissue_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_tissues', n)], info, 1);
+    info.Datatype = 'uint8';
+    niftiwriteresorted(classified_tissue_rescaled_all_images{n}, [outputPath sprintf('Phantom_%d_tissues', n)], info, 1);  
+    niftiwriteresorted(uint8(maskGrayMatter*255), [outputPath sprintf('Phantom_%d_grey_matter', n)], info, 1);
+    niftiwriteresorted(uint8(maskWhiteMatter*255), [outputPath sprintf('Phantom_%d_white_matter', n)], info, 1);
 end
 
 %% PHANTOM TO USE
