@@ -72,7 +72,7 @@ class Unet(nn.Module):
         #self.Layer5Down = DownConv(256, 512)
 
         #self.Middle = DownConv(512, 512)
-        self.Middle = DownConv(256, 256)
+        self.Middle = DownConv(256, 512)
 
         #self.Layer1Up = UpConv(1024, 256)
         #self.Layer2Up = UpConv(512, 128)

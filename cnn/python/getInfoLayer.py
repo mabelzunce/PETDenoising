@@ -25,17 +25,35 @@ from utils import showSubplots
 from unet import UnetWithResidual
 
 path = os.getcwd()
-pathGroundTruth = path+'/groundTruth/100'
+
+# Model:
+learning_rate=0.00005
+nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
+#nameModel = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate)
+epoch = 23
+pathModel = '../../../Results/' + nameModel + '/'
+
+model = UnetWithResidual(1,1)
+modelsPath = pathModel + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
+#modelsPath = path+'/ModeloUnetResidualNoNorm/UnetWithResidual_MSE_lr5e-05_22_best_fit'
+model.load_state_dict(torch.load(modelsPath, map_location=torch.device('cpu')))
+#model.load_state_dict(torch.load('bestModelDataSet3_6'))
+
+#nameModel = 'UnetWithResidual_MSE_lr5e-05_33_best_fit'
+
+# Data:
+path = 'D:/UNSAM/PET/BrainWebSimulations/'
+pathGroundTruth = path+'/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 
-pathNoisyDataSet = path+'/noisyDataSet/5'
+pathNoisyDataSet = path+'/5'
 arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
 
-pathGreyMask = path+'/PhantomsGreyMask'
-arrayGreyMask= os.listdir(pathGreyMask)
+#pathGreyMask = path+'/Phantoms/'
+#arrayGreyMask= os.listdir(pathGreyMask)
 
-pathWhiteMask = path+'/PhantomsWhiteMask'
-arrayWhiteMask= os.listdir(pathWhiteMask)
+#pathWhiteMask = path+'/Phantoms/'
+#arrayWhiteMask= os.listdir(pathWhiteMask)
 
 #calculo metricas por sujeto...
 # leo el fantoma, el ground truth y las mascaras por sujeto
@@ -76,13 +94,7 @@ def get_activation(name):
         activation[name] = output.detach()
     return hook
 
-model = UnetWithResidual(1,1)
-modelsPath = path+'/ModeloUnetResidualUno/UnetWithResidual_MSE_lr5e-05_33_best_fit'
-#modelsPath = path+'/ModeloUnetResidualNoNorm/UnetWithResidual_MSE_lr5e-05_22_best_fit'
-model.load_state_dict(torch.load(modelsPath, map_location=torch.device('cpu')))
-#model.load_state_dict(torch.load('bestModelDataSet3_6'))
 
-nameModel = 'UnetWithResidual_MSE_lr5e-05_33_best_fit'
 
 activation = {}
 

@@ -277,14 +277,20 @@ def torchToNp(dataTorch) :
     img = (img).detach().numpy()
     return img
 
+
 def testModelSlice(model, inputsDataSet):
-
-    #torch.Tensor.numpy
-
     inputs = inputsDataSet
     inputs = torch.unsqueeze(inputs, dim=0)
     out = model(inputs)
 
+    return out
+
+def RunModel(model, inputsDataSet):
+    inputs = inputsDataSet
+    # If only one slice (3 dmins), add one dimension:
+    if inputs.dim == 3:
+        inputs = torch.unsqueeze(inputs, dim=0)
+    out = model(inputs)
     return out
 
 def mseAntDspModelTorchSlice(inputs,outputs, groundTruth, cantPixels = None):
@@ -398,6 +404,19 @@ def covValue(img, maskGrey):
 
     return cov
 
+def covValuePerSlice(img, mask):
+    '''
+    Se calcula a partir del std y mean en materia gris
+    '''
+    maskedImage = mask * img
+
+    meanValuePerSlice = maskedImage.reshape(maskedImage.shape[0], -1).mean(axis=1)
+    stdValuePerSlice = maskedImage.reshape(maskedImage.shape[0], -1).std(axis=1)
+
+    covPerSlice = meanValuePerSlice / stdValuePerSlice
+    covPerSlice = np.nan_to_num(covPerSlice)
+    return covPerSlice
+
 def crcValue(img, maskGrey, maskWhite):
     '''
     mean materia gris/ mean materia blanca
@@ -418,3 +437,19 @@ def crcValue(img, maskGrey, maskWhite):
     crc = meanMateriaGris / meanMateriaBlanca
 
     return crc
+
+
+def crcValuePerSlice(img, maskGrey, maskWhite):
+    '''
+    mean materia gris/ mean materia blanca for each slice of a 3D image received as numpy array.
+    '''
+
+    maskedWhiteMatter = maskWhite * img
+    maskedGreyMatter = maskGrey * img
+
+    meanGreyMatterPerSlice = maskedGreyMatter.reshape(maskedGreyMatter.shape[0], -1).mean(axis=1)
+    meanWhiteMatterPerSlice = maskedWhiteMatter.reshape(maskedWhiteMatter.shape[0], -1).mean(axis=1)
+
+    crcPerSlice = meanGreyMatterPerSlice / meanGreyMatterPerSlice
+    crcPerSlice = np.nan_to_num(crcPerSlice)
+    return crcPerSlice

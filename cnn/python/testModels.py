@@ -16,39 +16,67 @@ from utils import obtenerMask
 from utils import showGridNumpyImg
 from utils import saveNumpyAsNii
 from utils import getTestOneModelOneSlices
-from utils import covValue
-from utils import crcValue
-
+from utils import covValuePerSlice
+from utils import crcValuePerSlice
+from utils import RunModel
 import SimpleITK as sitk
 import numpy as np
 import pandas as pd
 import os
 from sklearn.model_selection import train_test_split
 
-# Testeo todos lo modelos...
+######## CONFIG ###########
+normalizeInput = True
+learning_rate=0.00005
+lowDose_perc = 5
+epoch = 23
+actScaleFactor = 100/lowDose_perc
+allSubjects = [*range(1,21)]
+validSubjects = [2, 4, 6, 8]
+trainingSubjects = allSubjects
+for i in validSubjects:
+    trainingSubjects.remove(i)
+###########################
 
-model = UnetWithResidual(1,1)
+######################### CHECK DEVICE ######################
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
+#############################################################
 
+######### PATHS ############
 path = os.getcwd()
 
-#modelsPath = path+'/Modelo7'
-modelsPath = path+'/ModeloUnetResidualNoNorm'
-#modelsPath = path+'/Modelo8'
-models = os.listdir(modelsPath)
+# model
+nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
+#nameModel = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate)
+modelsPath = '../../../Results/' + nameModel + '/Models/'
+modelFilename = modelsPath + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
 
-pathSaveResults = "C:/Users/Encargado/Desktop/RESULTADOS/UnetResidualNoNorm"
+# Data path
+dataPath = 'D:/UNSAM/PET/BrainWebSimulations/'
+groundTruthSubdir = '100'
+lowDoseSubdir = str(lowDose_perc)
 
-pathGroundTruth = path+'/newDataset/groundTruth/100'
+# Output
+pathSaveResults = '../../../Results/' + nameModel + '/'
+
+########### CREATE MODEL ###########
+model = UnetWithResidual(1,1) # model = Unet(1,1)
+
+
+########## LIST OF MODELS ###############
+modelFilenames = os.listdir(modelsPath)
+
+
+########## PROCESSS DATA ###############
+# Data:
+pathGroundTruth = dataPath + '/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 
-pathNoisyDataSet = path+'/newDataset/noisyDataSet/5'
+pathNoisyDataSet = dataPath + str(lowDose_perc)
 arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
 
-pathGreyMask = path+'/newDataset/maskGreyMatter'
-arrayGreyMask= os.listdir(pathGreyMask)
-
-pathWhiteMask = path+'/newDataset/maskWhiteMatter'
-arrayWhiteMask= os.listdir(pathWhiteMask)
+pathPhantoms = dataPath + '/Phantoms/'
 
 nameGroundTruth=[]
 groundTruthArray = []
@@ -56,18 +84,6 @@ noisyImagesArray = []
 greyMaskArray = []
 whiteMaskArray = []
 
-#validSubjects = [10,19]
-#validSubjects = [8,17]
-#validSubjects = [1,5]
-validSubjects = [12,4,10,20]
-trainSubjects = [1,2,3,5,6,7,8,9,11,13,14,15,16,17,18,19]
-
-conjunto = 'Train'
-excluirConjunto = validSubjects
-
-nameModel = 'UnetResidualNoNorm'
-
-nameConjunto = []
 
 # leo los dataSet
 for element in arrayGroundTruth:
@@ -79,40 +95,39 @@ for element in arrayGroundTruth:
     groundTruth = reshapeDataSet(groundTruth)
 
     name, extension = os.path.splitext(element)
-    if extension == '.nii':
+    if extension == '.gz':
         name, extension2 = os.path.splitext(name)
+        extension = extension2 + extension
+
     ind = name.find('Subject')
     name = name[ind + len('Subject'):]
 
-    nameGroundTruth.append(name)
-
     # read noisyDataSet
-    nametrainNoisyDataSet = 'noisyDataSet5_Subject' + name + '.nii'
+    nametrainNoisyDataSet = 'noisyDataSet' + str(lowDose_perc) + '_Subject' + name + '.nii'
     pathNoisyDataSetElement = pathNoisyDataSet + '/' + nametrainNoisyDataSet
     noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
     noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
     noisyDataSet = reshapeDataSet(noisyDataSet)
 
     # read greyMask
-    nameGreyMask = 'Subject' + name + 'GreyMask.nii'
-    pathGreyMaskElement = pathGreyMask + '/' + nameGreyMask
+    nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
+    pathGreyMaskElement = pathPhantoms + '/' + nameGreyMask
     greyMask = sitk.ReadImage(pathGreyMaskElement)
     greyMask = sitk.GetArrayFromImage(greyMask)
     greyMask = reshapeDataSet(greyMask)
 
     # read whiteMask
-    nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
-    pathWhiteMaskElement = pathWhiteMask + '/' + nameWhiteMask
+    nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
+    pathWhiteMaskElement = pathPhantoms + '/' + nameWhiteMask
     whiteMask = sitk.ReadImage(pathWhiteMaskElement)
     whiteMask = sitk.GetArrayFromImage(whiteMask)
     whiteMask = reshapeDataSet(whiteMask)
 
-    if int(name) not in excluirConjunto:
-        groundTruthArray.append(groundTruth)
-        noisyImagesArray.append(noisyDataSet)
-        greyMaskArray.append(greyMask)
-        whiteMaskArray.append(whiteMask)
-        nameConjunto.append(name)
+    nameGroundTruth.append(name)
+    groundTruthArray.append(groundTruth)
+    noisyImagesArray.append(noisyDataSet)
+    greyMaskArray.append(greyMask)
+    whiteMaskArray.append(whiteMask)
 
 
 # paso al modelo y evaluo resultados
@@ -120,6 +135,47 @@ noisyImagesArray = np.array(noisyImagesArray)
 groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
 greyMaskArray = np.array(greyMaskArray)
+
+# Get the maximum value per slice:
+maxSlice = noisyImagesArray[:, :, :, :].max(axis=4).max(axis=3)
+maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
+# Normalize the input if necessary:
+if normalizeInput:
+    noisyImagesArray = noisyImagesArray/maxSlice[:,:,:,None,None]
+    noisyImagesArray = np.nan_to_num(noisyImagesArray)
+contModel = 0
+modelName = []
+
+allModelsCrc = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsCov = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMeanGM = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+for modelFilename in modelFilenames:
+    contModel = contModel+ 1
+    model.load_state_dict(torch.load(modelsPath + modelFilename, map_location=torch.device(device)))
+    modelName.append(modelFilename)
+
+    for sub in range(0, len(noisyImagesArray)):
+        # Get images for one subject as a torch tensor:
+        noisyImagesSubject = noisyImagesArray[sub, :, :, :, :]
+        groundTruthSubject = groundTruthArray[sub, :, :, :, :].squeeze() # Remove the channel dimension
+        whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
+        greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
+        maxSliceSubject = maxSlice[sub, :].squeeze()
+        # Run the model for all the slices:
+        outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
+        # Convert it into numpy:
+        ndaOutputModel = outModel.detach().numpy()
+        ndaOutputModel = ndaOutputModel.squeeze()  # Remove the channel dimension
+        # Unnormalize if using normalization:
+        if normalizeInput:
+            ndaOutputModel = ndaOutputModel * maxSliceSubject[:,None,None]
+        # Compute metrics for each slice:
+        maskedImage = (ndaOutputModel * greyMaskSubject)
+        allModelsMeanGM[contModel,sub,:] = maskedImage.reshape(maskedImage.shape[0], -1).mean(axis=1)
+        allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
+        allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
+
+
 
 noisyImagesArray = torch.from_numpy(noisyImagesArray)
 groundTruthArray = torch.from_numpy(groundTruthArray)
@@ -178,10 +234,10 @@ allModelsStdValueSigma8 = []
 modelName = []
 contModel = 0
 
-for nroModel in models:
+for modelFilename in modelFilenames:
     contModel = contModel+ 1
-    model.load_state_dict(torch.load(modelsPath+'/'+nroModel, map_location=torch.device('cpu')))
-    modelName.append(nroModel)
+    model.load_state_dict(torch.load(modelsPath + modelFilename, map_location=torch.device(device)))
+    modelName.append(modelFilename)
 
     crcSliceDspSigma4 = []
     covSliceDspSigma4 = []
@@ -269,7 +325,7 @@ for nroModel in models:
     subjectName = []
     subjectSlice = []
 
-    print('Modelo {} de {}'.format(contModel, len(models)))
+    print('Modelo {} de {}'.format(contModel, len(modelFilenames)))
 
     for sub in range(0,len(noisyImagesArray)):
 
@@ -281,7 +337,7 @@ for nroModel in models:
         outFilterSigma6 = []
         outFilterSigma8 = []
 
-        subjectNumbers= nameConjunto[sub]
+        subjectNumbers = nameGroundTruth[sub]
         subjectName.append(subjectNumbers)
 
         subjectImagesTotal = noisyImagesArray[sub, :, :, :]
@@ -296,7 +352,7 @@ for nroModel in models:
 
         contIdx = 0
 
-        print('Subject:',nameConjunto[sub])
+        print('Subject:',nameGroundTruth[sub])
 
         idx = 0
 
@@ -304,8 +360,6 @@ for nroModel in models:
 
             subjectSlice.append(contIdx)
 
-            maxSlice = subjectImagesTotal[contIdx,0 ,:, :].max()
-            maxSliceGroundTruth = groundTruthSubjectTotal[contIdx,0 ,:, :].max()
 
             if (maxSlice > 0.0000001) and (maxSliceGroundTruth > 0.0):
 
