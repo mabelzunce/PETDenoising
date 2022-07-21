@@ -36,6 +36,8 @@ validSubjects = [2, 4, 6, 8]
 trainingSubjects = allSubjects
 for i in validSubjects:
     trainingSubjects.remove(i)
+batchSubjects = True
+batchSubjectsSize = 20
 ###########################
 
 ######################### CHECK DEVICE ######################
@@ -49,16 +51,20 @@ path = os.getcwd()
 # model
 nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
 #nameModel = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate)
-modelsPath = '../../../Results/' + nameModel + '/Models/'
+#modelsPath = '../../../Results/' + nameModel + '/Models/'
+modelsPath = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '/Models/'
 modelFilename = modelsPath + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
 
 # Data path
-dataPath = 'D:/UNSAM/PET/BrainWebSimulations/'
+#dataPath = 'D:/UNSAM/PET/BrainWebSimulations/'
+
+dataPath = 'C:/Users/Encargado/Desktop/Milagros/NewDataset/'
 groundTruthSubdir = '100'
 lowDoseSubdir = str(lowDose_perc)
 
 # Output
-pathSaveResults = '../../../Results/' + nameModel + '/'
+pathSaveResults = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '/'
+#pathSaveResults = '../../../Results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
 model = UnetWithResidual(1,1) # model = Unet(1,1)
@@ -66,7 +72,6 @@ model = UnetWithResidual(1,1) # model = Unet(1,1)
 
 ########## LIST OF MODELS ###############
 modelFilenames = os.listdir(modelsPath)
-
 
 ########## PROCESSS DATA ###############
 # Data:
@@ -83,7 +88,6 @@ groundTruthArray = []
 noisyImagesArray = []
 greyMaskArray = []
 whiteMaskArray = []
-
 
 # leo los dataSet
 for element in arrayGroundTruth:
@@ -110,14 +114,16 @@ for element in arrayGroundTruth:
     noisyDataSet = reshapeDataSet(noisyDataSet)
 
     # read greyMask
-    nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
+    #nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
+    nameGreyMask = 'Subject' + name + 'GreyMask.nii'
     pathGreyMaskElement = pathPhantoms + '/' + nameGreyMask
     greyMask = sitk.ReadImage(pathGreyMaskElement)
     greyMask = sitk.GetArrayFromImage(greyMask)
     greyMask = reshapeDataSet(greyMask)
 
     # read whiteMask
-    nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
+    #nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
+    nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
     pathWhiteMaskElement = pathPhantoms + '/' + nameWhiteMask
     whiteMask = sitk.ReadImage(pathWhiteMaskElement)
     whiteMask = sitk.GetArrayFromImage(whiteMask)
@@ -129,8 +135,6 @@ for element in arrayGroundTruth:
     greyMaskArray.append(greyMask)
     whiteMaskArray.append(whiteMask)
 
-
-# paso al modelo y evaluo resultados
 noisyImagesArray = np.array(noisyImagesArray)
 groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
@@ -146,9 +150,11 @@ if normalizeInput:
 contModel = 0
 modelName = []
 
-allModelsCrc = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsCov = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsMeanGM = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsCrcSubjectInfo = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsCovSubjectInfo = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMeanGMSSubjectInfo = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMeanWMSSubjectInfo = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+outModel = np.zeros((noisyImagesArray.shape[1], 1,noisyImagesArray.shape[3], noisyImagesArray.shape[3]))
 for modelFilename in modelFilenames:
     contModel = contModel+ 1
     model.load_state_dict(torch.load(modelsPath + modelFilename, map_location=torch.device(device)))
@@ -161,21 +167,39 @@ for modelFilename in modelFilenames:
         whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
         greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
         maxSliceSubject = maxSlice[sub, :].squeeze()
-        # Run the model for all the slices:
-        outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
-        # Convert it into numpy:
-        ndaOutputModel = outModel.detach().numpy()
+
+        if batchSubjects:
+            # Divido el dataSet
+            numBatches = np.round(noisyImagesSubject.shape[0] / batchSubjectsSize).astype(int)
+            # Run the model for all the slices:
+            for i in range(numBatches):
+                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(
+                noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
+            ndaOutputModel = outModel
+        else:
+            outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
+            # Convert it into numpy:
+            ndaOutputModel = outModel.detach().numpy()
+
         ndaOutputModel = ndaOutputModel.squeeze()  # Remove the channel dimension
         # Unnormalize if using normalization:
         if normalizeInput:
             ndaOutputModel = ndaOutputModel * maxSliceSubject[:,None,None]
+
         # Compute metrics for each slice:
-        maskedImage = (ndaOutputModel * greyMaskSubject)
-        allModelsMeanGM[contModel,sub,:] = maskedImage.reshape(maskedImage.shape[0], -1).mean(axis=1)
-        allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
-        allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
+        greyMaskedImage = (ndaOutputModel * greyMaskSubject)
+        whiteMaskedImage = (ndaOutputModel * whiteMaskSubject)
+
+        #allModelsMeanGMSSubjectSlice[contModel, sub,sliceNro, :] =
 
 
+        # Compute metrics for each subject:
+        allModelsMeanGMSSubjectInfo[contModel,sub,:] = greyMaskedImage.reshape(greyMaskedImage.shape[0], -1).mean(axis=1)
+        allModelsMeanWMSSubjectInfo[contModel, sub, :] = whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1).mean(axis=1)
+        allModelsCrcSubjectInfo[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
+        allModelsCovSubjectInfo[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
+
+        # Compute metrics for each model and all subjects:
 
 noisyImagesArray = torch.from_numpy(noisyImagesArray)
 groundTruthArray = torch.from_numpy(groundTruthArray)
