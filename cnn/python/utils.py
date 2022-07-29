@@ -393,7 +393,7 @@ def covValue(img, maskGrey):
     '''
     materiaGris = img * maskGrey
 
-    materiaGris = (torch.Tensor.numpy(materiaGris)).flatten()
+    materiaGris = ((materiaGris)).flatten()
 
     materiaGris = materiaGris[materiaGris != 0.0]
 
@@ -408,10 +408,11 @@ def covValuePerSlice(img, mask):
     '''
     Se calcula a partir del std y mean en materia gris
     '''
-    maskedImage = mask * img
 
-    meanValuePerSlice = maskedImage.reshape(maskedImage.shape[0], -1).mean(axis=1)
-    stdValuePerSlice = maskedImage.reshape(maskedImage.shape[0], -1).std(axis=1)
+    masked = mask * img
+    masked = masked.reshape(masked.shape[0], -1)
+    meanValuePerSlice = meanPerSlice(masked)
+    stdValuePerSlice = stdPerSlice(masked)
 
     covPerSlice = meanValuePerSlice / stdValuePerSlice
     covPerSlice = np.nan_to_num(covPerSlice)
@@ -425,8 +426,8 @@ def crcValue(img, maskGrey, maskWhite):
     materiaBlanca = maskWhite * img
     materiaGris = maskGrey * img
 
-    materiaGris = (torch.Tensor.numpy(materiaGris)).flatten()
-    materiaBlanca = (torch.Tensor.numpy(materiaBlanca)).flatten()
+    materiaGris = ((materiaGris)).flatten()
+    materiaBlanca = ((materiaBlanca)).flatten()
 
     materiaGris  = materiaGris [materiaGris  != 0.0]
     materiaBlanca = materiaBlanca[materiaBlanca != 0.0]
@@ -438,18 +439,177 @@ def crcValue(img, maskGrey, maskWhite):
 
     return crc
 
+def meanPerSlice(masked):
+
+    X = np.ma.masked_equal(masked, 0)
+    nonZeros = np.sum((~(X.mask)), axis=1)
+    pixelNonZeros = np.sum(masked, axis=1)
+    meanPerSlice = pixelNonZeros/nonZeros
+    meanPerSlice = np.nan_to_num(meanPerSlice)
+    meanPerSlice.reshape(masked.shape[0], -1)
+
+    return meanPerSlice
+
+def stdPerSlice(masked):
+
+    stdPerSlice = np.nanstd(np.where(np.isclose(masked, 0), np.nan, masked),axis=1)
+    stdPerSlice = np.nan_to_num(stdPerSlice)
+    #stdPerSlice.reshape(stdPerSlice.shape[0], 1)
+
+    return stdPerSlice
+
+def meanPerSubject(masked):
+
+    X = np.ma.masked_equal(masked, 0)
+    nonZeros = np.sum((~(X.mask)), axis=0)
+    pixelNonZeros = np.sum(masked, axis=0)
+    meanPerSlice = pixelNonZeros/nonZeros
+    meanPerSlice = np.nan_to_num(meanPerSlice)
+
+    return meanPerSlice
+
+def stdPerSubject(masked):
+
+    stdPerSlice = np.nanstd(np.where(np.isclose(masked, 0), np.nan, masked),axis=0)
+    stdPerSlice = np.nan_to_num(stdPerSlice)
+
+    return stdPerSlice
+
 
 def crcValuePerSlice(img, maskGrey, maskWhite):
     '''
     mean materia gris/ mean materia blanca for each slice of a 3D image received as numpy array.
     '''
 
-    maskedWhiteMatter = maskWhite * img
-    maskedGreyMatter = maskGrey * img
+    maskedGrey = img * maskGrey
+    maskedGrey = maskedGrey.reshape(maskedGrey.shape[0], -1)
+    meanGreyMatterPerSlice = meanPerSlice(maskedGrey)
 
-    meanGreyMatterPerSlice = maskedGreyMatter.reshape(maskedGreyMatter.shape[0], -1).mean(axis=1)
-    meanWhiteMatterPerSlice = maskedWhiteMatter.reshape(maskedWhiteMatter.shape[0], -1).mean(axis=1)
+    maskedWhite = img * maskWhite
+    maskedWhite = maskedWhite.reshape(maskedWhite.shape[0], -1)
+    meanWhiteMatterPerSlice = meanPerSlice(maskedWhite)
 
-    crcPerSlice = meanGreyMatterPerSlice / meanGreyMatterPerSlice
+    crcPerSlice = meanGreyMatterPerSlice / meanWhiteMatterPerSlice
     crcPerSlice = np.nan_to_num(crcPerSlice)
+
     return crcPerSlice
+
+
+def crcValuePerSubject(img, maskGrey, maskWhite):
+    '''
+    mean materia gris/ mean materia blanca for each slice of a 3D image received as numpy array.
+    '''
+
+    maskedGrey = img * maskGrey
+    maskedGrey = maskedGrey.reshape(-1)
+    meanGreyMatterPerSubject = meanPerSubject(maskedGrey)
+
+    maskedWhite = img * maskWhite
+    maskedWhite = maskedWhite.reshape(-1)
+    meanWhiteMatterPerSubject = meanPerSubject(maskedWhite)
+
+    crcPerSubject = meanGreyMatterPerSubject / meanWhiteMatterPerSubject
+    crcPerSubject = np.nan_to_num(crcPerSubject)
+
+    return crcPerSubject
+
+def covValuePerSubject(img, mask):
+    '''
+    Se calcula a partir del std y mean en materia gris
+    '''
+
+    masked = mask * img
+    masked = masked.reshape(-1)
+    meanValuePerSubject = meanPerSubject(masked)
+    stdValuePerSubject = stdPerSubject(masked)
+
+    covPerSubject = meanValuePerSubject / stdValuePerSubject
+    covPerSubject = np.nan_to_num(covPerSubject)
+    return covPerSubject
+
+def mseValuePerSlice(image1, image2):
+    cuadradoDeDif = ((image1 - image2) ** 2)
+    suma = np.sum(np.sum(cuadradoDeDif,axis=1),axis=1)
+    cantPix = image2.shape[-1] * image1.shape[-2]  # img1 and 2 should have same shape
+    error = suma / cantPix
+    return error
+
+def mseValuePerSubject(image1, image2):
+    cuadradoDeDif = ((image1 - image2) ** 2)
+    suma = np.sum(np.sum(np.sum(cuadradoDeDif,axis=1),axis=1))
+    cantPix = image2.shape[-1] * image1.shape[-2]  # img1 and 2 should have same shape
+    error = suma / cantPix
+    return error
+
+def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,saveFig = False , pathSave = None):
+    y = []
+    namesGraph = []
+
+    # las dims no dependen de la cantidad de modelos
+    antes = antesImages
+
+    # Cantidad de modelos
+    dspModel = modelsImages
+    cantModels = modelsImages.shape[0]
+
+    namesGraph.append(names[0])
+
+    # Cantidad de filtros
+    dspFiltros = filtersImages
+    cantFiltros = filtersImages.shape[0]
+
+    if antes.shape == ():
+        antes = np.repeat(antes, cantModels, axis=0)
+        modelPlot = dspModel.flatten()
+        y.append(antes)
+        y.append(modelPlot)
+        namesGraph.append(names[1])
+        for fil in range(0, cantFiltros):
+            filterPlot = dspFiltros[fil]
+            filterPlot = np.repeat(filterPlot, cantModels, axis=0)
+            y.append(filterPlot)
+            name = names[2] + str(sigmas[fil])
+            namesGraph.append(name)
+
+        x = np.arange(0, len(dspModel))
+
+    else:
+        y.append(antes)
+        for mdl in range(0, cantModels):
+            modelPlot = dspModel[mdl]
+            y.append(modelPlot)
+            name = names[1] + str(sigmas[mdl])
+            namesGraph.append(name)
+        for fil in range(0, cantFiltros):
+            filterPlot = dspFiltros[fil]
+            y.append(filterPlot)
+            name = names[2] + str(sigmas[fil])
+            namesGraph.append(name)
+
+        x = np.arange(0, antesImages.shape[-1])
+
+    for graf in range(0, len(y)):
+        y1 = y[graf]
+        plt.plot(x, y1, label = namesGraph[graf])
+
+        plt.legend(loc="upper left")
+
+    plt.show(block=False)
+    plt.title(graphName)
+    plt.draw()
+    plt.pause(0.0001)
+
+    if saveFig == True:
+        plt.savefig(pathSave + graphName)
+
+def saveDataCsv(listToSave,name,path):
+    cantDims = listToSave.ndim
+    if cantDims <= 2:
+        pathSave = path + name
+        pd.DataFrame(np.array(listToSave)).to_csv(pathSave)
+    else:
+        newArray = listToSave[0, :, :]
+        for i in range(1, cantDims):
+            newArray = np.concatenate((newArray, listToSave[i, :, :]))
+        pathSave = path + name
+        pd.DataFrame(np.array(newArray)).to_csv(pathSave)
