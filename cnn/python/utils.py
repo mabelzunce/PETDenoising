@@ -541,7 +541,8 @@ def mseValuePerSubject(image1, image2):
     error = suma / cantPix
     return error
 
-def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,saveFig = False , pathSave = None):
+def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,namesModel,saveFig = False , pathSave = None):
+    # falta poner bien los nombres de los modelos...
     y = []
     namesGraph = []
 
@@ -571,21 +572,20 @@ def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,s
             name = names[2] + str(sigmas[fil])
             namesGraph.append(name)
 
-        x = np.arange(0, len(dspModel))
+    x = np.arange(0, len(dspModel))
 
     else:
         y.append(antes)
         for mdl in range(0, cantModels):
             modelPlot = dspModel[mdl]
             y.append(modelPlot)
-            name = names[1] + str(sigmas[mdl])
+            name = names[1] + namesModel[mdl]
             namesGraph.append(name)
         for fil in range(0, cantFiltros):
             filterPlot = dspFiltros[fil]
             y.append(filterPlot)
             name = names[2] + str(sigmas[fil])
             namesGraph.append(name)
-
         x = np.arange(0, antesImages.shape[-1])
 
     for graf in range(0, len(y)):
