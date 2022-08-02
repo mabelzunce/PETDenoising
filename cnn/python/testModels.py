@@ -15,6 +15,7 @@ from utils import mseAntDspModelTorchSlice
 from utils import testModelSlice
 from utils import obtenerMask
 from utils import showDataPlot
+from utils import showPlotGlobalData
 from utils import saveNumpyAsNii
 from utils import getTestOneModelOneSlices
 from utils import covValue
@@ -389,16 +390,16 @@ for modelFilename in modelFilenames:
 # Show plot
 if showGlobalPlots == True:
     namesPlot = ['COV antes', 'COV modelos', 'COV filtros']
-    showDataPlot(covInputImageGlobal,allModelsCOVGlobal,covFilterGlobal,filters * (int(voxelSize[0])),
-                 namesModel=modelName,graphName = 'Cov',names=namesPlot)
-    showDataPlot(covInputImagePerSubject, allModelsCOVperSubject, covFilterPerSubject, filters * (int(voxelSize[0])),
-                 namesModel=modelNames, graphName='Cov ',names=namesPlot)
+    showPlotGlobalData(covInputImageGlobal,allModelsCOVGlobal,covFilterGlobal,filters * (int(voxelSize[0])),
+                 namesModel=modelName,graphName = 'Cov all models',names=namesPlot)
+    showPlotGlobalData(covInputImagePerSubject, allModelsCOVperSubject, covFilterPerSubject, filters * (int(voxelSize[0])),
+                 namesModel=modelName, graphName = 'Cov all models',names=namesPlot)
     namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
-    showDataPlot(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
-                 filters * (int(voxelSize[0])), namesModel=modelNames,graphName='MSE Grey Matter', names=namesPlot)
+    showPlotGlobalData(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
+                 filters * (int(voxelSize[0])), namesModel=modelName,graphName='MSE Grey Matter all models', names=namesPlot)
     namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
-    showDataPlot(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
-                 filters * (int(voxelSize[0])), namesModel=modelNames, graphName='MSE Grey Matter',
+    showPlotGlobalData(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
+                 filters * (int(voxelSize[0])), namesModel=modelName, graphName='MSE Grey Matter all models',
                  names=namesPlot,saveFig = True, pathSave=pathSaveResults)
 
 

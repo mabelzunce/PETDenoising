@@ -61,7 +61,7 @@ def showSubplots(img, title):
         ax.get_xaxis().set_visible(False)
         ax.get_yaxis().set_visible(False)
         if img_count < img.shape[0]:
-            im = ax.imshow(img[img_count, 0, :, :],cmap = 'gray')
+            im = ax.imshow(img[img_count, :, :],cmap = 'gray')
             img_count = img_count + 1
 
     fig.subplots_adjust(right=0.8)
@@ -541,6 +541,58 @@ def mseValuePerSubject(image1, image2):
     error = suma / cantPix
     return error
 
+def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,names,namesModel,saveFig = False , pathSave = None):
+    # falta poner bien los nombres de los modelos...
+    y = []
+    namesGraph = []
+
+    # las dims no dependen de la cantidad de modelos
+    antes = antesImages
+
+    # Cantidad de modelos
+    dspModel = modelsImages
+    cantModels = modelsImages.shape[0]
+
+    namesGraph.append(names[0])
+
+    # Cantidad de filtros
+    dspFiltros = filtersImages
+    cantFiltros = filtersImages.shape[0]
+
+    if antes.shape == ():
+        antes = np.repeat(antes, cantModels, axis=0)
+        modelPlot = dspModel.flatten()
+        y.append(antes)
+        y.append(modelPlot)
+        namesGraph.append(names[1])
+        for fil in range(0, cantFiltros):
+            filterPlot = dspFiltros[fil]
+            filterPlot = np.repeat(filterPlot, cantModels, axis=0)
+            y.append(filterPlot)
+            name = names[2] + str(sigmas[fil])
+            namesGraph.append(name)
+
+        x = np.arange(0, len(dspModel))
+        plt.figure()
+
+        for graf in range(0, len(y)):
+            y1 = y[graf]
+            plt.plot(x, y1, label = namesGraph[graf])
+
+            plt.legend(loc="upper left")
+
+        plt.xticks(x,namesModel)
+        plt.show(block=False)
+        plt.title(graphName)
+        plt.draw()
+        plt.pause(0.0001)
+
+    else:
+        print("No son valores globales")
+
+    if saveFig == True:
+        plt.savefig(pathSave + graphName)
+
 def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,namesModel,saveFig = False , pathSave = None):
     # falta poner bien los nombres de los modelos...
     y = []
@@ -572,7 +624,7 @@ def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,n
             name = names[2] + str(sigmas[fil])
             namesGraph.append(name)
 
-    x = np.arange(0, len(dspModel))
+        x = np.arange(0, len(dspModel))
 
     else:
         y.append(antes)
@@ -588,6 +640,7 @@ def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,n
             namesGraph.append(name)
         x = np.arange(0, antesImages.shape[-1])
 
+    plt.figure()
     for graf in range(0, len(y)):
         y1 = y[graf]
         plt.plot(x, y1, label = namesGraph[graf])
