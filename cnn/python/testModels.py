@@ -2,9 +2,10 @@ import torch
 import torchvision
 import skimage
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
 
 #from unetM import Unet
-#from unet import Unet
+from unet import Unet
 from unet import UnetWithResidual
 from utils import imshow
 from utils import reshapeDataSet
@@ -46,14 +47,21 @@ trainingSubjects = allSubjects
 for i in validSubjects:
     trainingSubjects.remove(i)
 
+# Subject
+analisisSub = 5
+analisisSlice = 80
+#
 batchSubjects = True
 batchSubjectsSize = 20
 # Results visualization
 showGlobalPlots = True
 showPerfilSlices = True
+showImageSub = True
 # Save results
 saveModelOutputAsNiftiImage = False
+saveModelOutputAsNiftiImageOneSubject = True
 saveFilterOutputAsNiftiImage = False
+saveFilterOutputAsNiftiImageOneSubject = True
 saveDataCSV = True
 ###########################
 
@@ -67,7 +75,7 @@ path = os.getcwd()
 
 # model
 nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-#nameModel = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate)
+#nameModel = 'Model3Version2_norm'
 #modelsPath = '../../../Results/' + nameModel + '/Models/'
 modelsPath = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '/Models/'
 modelFilename = modelsPath + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
@@ -84,7 +92,8 @@ pathSaveResults = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '
 #pathSaveResults = '../../../Results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
-model = UnetWithResidual(1,1) # model = Unet(1,1)
+model = UnetWithResidual(1,1)
+#model = Unet(1,1)
 
 
 ########## LIST OF MODELS ###############
@@ -216,6 +225,9 @@ mseGreyMatterFilterGlobal = np.zeros((len(filters)))
 meanGreyMatterFilterGlobal = np.zeros((len(filters)))
 meanWhiteMatterFilterGlobal = np.zeros((len(filters)))
 
+
+filterSub = []
+
 for sub in range(0, len(noisyImagesArrayOrig)):
     # Get images for one subject as a torch tensor:
     noisyImagesSubject = noisyImagesArrayOrig[sub, :, :, :, :].squeeze()
@@ -262,6 +274,16 @@ for sub in range(0, len(noisyImagesArrayOrig)):
             nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
+
+        if saveFilterOutputAsNiftiImageOneSubject and (analisisSub == sub) :
+            image = sitk.GetImageFromArray(np.array(filter))
+            image.SetSpacing(voxelSize)
+            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
+            save_path = os.path.join(pathSaveResults, nameImage)
+            sitk.WriteImage(image, save_path)
+
+        if sub == analisisSub:
+            filterSub.append(filter[analisisSlice,:,:])
 
         mseFilterPerSlice[fil,sub,:]=mseValuePerSlice(filter,groundTruthSubject)
 
@@ -353,7 +375,15 @@ for modelFilename in modelFilenames:
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
+        if saveModelOutputAsNiftiImageOneSubject and (analisisSub == sub) :
+            image = sitk.GetImageFromArray(np.array(filter))
+            image.SetSpacing(voxelSize)
+            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_OutModel_'+str(fil)+'.nii'
+            save_path = os.path.join(pathSaveResults, nameImage)
+            sitk.WriteImage(image, save_path)
 
+        if sub == analisisSub:
+            outputSub = ndaOutputModel[analisisSlice,:,:]
         # Compute metrics for each slice:
         greyMaskedImage = (ndaOutputModel * greyMaskSubject)
         whiteMaskedImage = (ndaOutputModel * whiteMaskSubject)
@@ -391,29 +421,85 @@ for modelFilename in modelFilenames:
 if showGlobalPlots == True:
     namesPlot = ['COV antes', 'COV modelos', 'COV filtros']
     showPlotGlobalData(covInputImageGlobal,allModelsCOVGlobal,covFilterGlobal,filters * (int(voxelSize[0])),
-                 namesModel=modelName,graphName = 'Cov all models',names=namesPlot)
-    showPlotGlobalData(covInputImagePerSubject, allModelsCOVperSubject, covFilterPerSubject, filters * (int(voxelSize[0])),
-                 namesModel=modelName, graphName = 'Cov all models',names=namesPlot)
-    namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
-    showPlotGlobalData(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
-                 filters * (int(voxelSize[0])), namesModel=modelName,graphName='MSE Grey Matter all models', names=namesPlot)
+                 namesModel=modelName,graphName = 'Cov all models',names=namesPlot, saveFig=True,
+                       pathSave=pathSaveResults)
+    namesPlot = ['CRC antes', 'CRC modelos', 'CRC filtros']
+    showPlotGlobalData(crcInputImageGlobal, allModelsCRCGlobal, crcFilterGlobal, filters * (int(voxelSize[0])),
+                       namesModel=modelName, graphName='Crc all models', names=namesPlot, saveFig=True,
+                       pathSave=pathSaveResults)
     namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
     showPlotGlobalData(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
                  filters * (int(voxelSize[0])), namesModel=modelName, graphName='MSE Grey Matter all models',
                  names=namesPlot,saveFig = True, pathSave=pathSaveResults)
-
+    namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
+    showPlotGlobalData(mseInputImageGlobal, allModelsMseGlobal, mseFilterGlobal,
+                       filters * (int(voxelSize[0])), namesModel=modelName, graphName='MSE all models',
+                       names=namesPlot, saveFig=True, pathSave=pathSaveResults)
 
 if showPerfilSlices == True:
     namesPlot = ['Mean antes', 'Mean model', 'Mean filtro']
-    subjectPlot = 5
     meanFilter = meanGreyMatterFilterPerSlice[:, :, :].mean(axis=2)
     meanOutModel = allModelsMeanGM[:, :, :].mean(axis=2)
     meanInputImage = meanGreyMatterInputImagePerSlice[:, :].mean(axis=1)
-    showDataPlot(meanGreyMatterInputImagePerSlice[subjectPlot, :] / meanInputImage[subjectPlot],
-                 allModelsMeanGM[:, subjectPlot, :] / meanOutModel[:, subjectPlot, None],
-                 meanGreyMatterFilterPerSlice[:, subjectPlot, :] / meanFilter[:, subjectPlot, None]
+    showDataPlot(meanGreyMatterInputImagePerSlice[analisisSub, :] / meanInputImage[analisisSub],
+                 allModelsMeanGM[:, analisisSub, :] / meanOutModel[:, analisisSub, None],
+                 meanGreyMatterFilterPerSlice[:, analisisSub, :] / meanFilter[:, analisisSub, None]
                  , filters * (int(voxelSize[0])), graphName='Mean Grey Matter',
                  names=namesPlot,namesModel = modelName, saveFig = True, pathSave=pathSaveResults)
 
+if showImageSub == True:
+    filterSub
+    outputSub
+    noisySub = noisyImagesArray[analisisSub, analisisSlice, 0, :, :]
+    gtSub = groundTruthArray[analisisSub, analisisSlice, 0, :, :]
+    totalImg = [gtSub, noisySub]
+    namesPlot = ['groundTruth', 'noisyImage']
+    if len(outputSub) < (noisyImagesArray.shape[-1]):
+        for i in range(0, len(outputSub)):
+            totalImg.append(outputSub[i])
+            namesPlot.append('Model')
+    else:
+        totalImg.append(outputSub)
+        namesPlot.append('Model')
+    if len(filterSub) < (noisyImagesArray.shape[-1]):
+        for i in range(0, len(filterSub)):
+            totalImg.append(filterSub[i])
+            namesPlot.append('Filter')
+    else:
+        totalImg.append(filterSub)
+        namesPlot.append('Filter')
+    cantImg = len(totalImg)
+    fig = plt.figure(figsize=(4, 4))
+    grid = ImageGrid(fig, 111,  # similar to subplot(111)
+                     nrows_ncols=(1, cantImg),
+                     axes_pad=0.1,
+                     )
+    for ax, im in zip(grid, totalImg):
+        img = ax.imshow(im, cmap='gray')
+
+    fig.subplots_adjust(right=0.8)
+    cbar_ax = fig.add_axes([0.85, 0.15, 0.05, 0.7])
+    fig.colorbar(img, cax=cbar_ax)
+    plt.show(block=False)
+    plt.savefig(pathSaveResults + 'ResultsModel')
+
 if saveDataCSV == True:
-    saveDataCsv(meanGreyMatterFilterPerSlice, 'MeanGreyMatterFilterPerSlice.csv', pathSaveResults)
+    saveDataCsv(meanGreyMatterFilterGlobal, 'meanGreyMatterFilterGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(meanGreyMatterInputImageGlobal, 'meanGreyMatterInputImageGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(allModelsMeanGMGlobal, 'meanGreyMatterAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+
+    saveDataCsv(covFilterGlobal, 'covFilterGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(covInputImageGlobal, 'covInputImageGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(allModelsCOVGlobal, 'covAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+
+    saveDataCsv(crcFilterGlobal, 'crcFilterGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(crcInputImageGlobal, 'crcInputImageGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(allModelsCRCGlobal, 'crcAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+
+    saveDataCsv(mseFilterGlobal, 'mseFilterGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(mseInputImageGlobal, 'mseInputImageGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(allModelsMseGlobal, 'mseAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+
+    saveDataCsv(mseGreyMatterFilterGlobal, 'mseGreyMatterFilterGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(mseGreyMatterInputImageGlobal, 'mseGreyMatterInputImageGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(allModelsGreyMatterMseGlobal, 'allModelsGreyMatterMseGlobal'+nameModel+'.csv', pathSaveResults)
