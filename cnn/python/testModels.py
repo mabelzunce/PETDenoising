@@ -75,7 +75,7 @@ path = os.getcwd()
 
 # model
 nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-#nameModel = 'Model3Version2_norm'
+# nameModel = 'Model3Version2_norm'
 #modelsPath = '../../../Results/' + nameModel + '/Models/'
 modelsPath = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '/Models/'
 modelFilename = modelsPath + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
@@ -167,6 +167,16 @@ groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
 greyMaskArray = np.array(greyMaskArray)
 
+#plt.figure()
+#plt.imshow(noisyImagesArray[12,50,0,:,:])
+#plt.imshow(noisyImagesArray[12,50,0,:,:])
+#plt.figure()
+#plt.imshow(greyMaskArray[12,50,0,:,:])
+#plt.figure()
+#plt.imshow(whiteMaskArray[12,50,0,:,:])
+#plt.figure()
+#plt.imshow(groundTruthArray[12,50,0,:,:])
+
 noisyImagesArrayOrig = noisyImagesArray
 
 # Get the maximum value per slice:
@@ -179,7 +189,109 @@ if normalizeInput:
 contModel = 0
 modelName = []
 
-## App filtros
+allModelsCrc = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsCov = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMeanGM = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMeanWM = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMeanGMperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsMeanWMperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsCOVperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsCRCperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsMsePerSlice = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsMsePerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsGreyMatterMsePerSlice = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+allModelsGreyMatterMsePerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+
+# Resultados globales
+allModelsCOVGlobal = np.zeros((len(modelFilenames), 1))
+allModelsCRCGlobal = np.zeros((len(modelFilenames), 1))
+allModelsMeanGMGlobal = np.zeros((len(modelFilenames), 1))
+allModelsMeanWMGlobal = np.zeros((len(modelFilenames), 1))
+allModelsMseGlobal = np.zeros((len(modelFilenames), 1))
+allModelsGreyMatterMseGlobal = np.zeros((len(modelFilenames), 1))
+
+outModel = np.zeros((noisyImagesArray.shape[1], 1,noisyImagesArray.shape[3], noisyImagesArray.shape[3]))
+for modelFilename in modelFilenames:
+    model.load_state_dict(torch.load(modelsPath + modelFilename, map_location=torch.device(device)))
+    modelName.append(modelFilename)
+
+    print('Model',contModel+1)
+    print('Model name', modelName[-1])
+
+    for sub in range(0, len(noisyImagesArray)):
+        # Get images for one subject as a torch tensor:
+        noisyImagesSubject = noisyImagesArray[sub, :, :, :, :]
+        groundTruthSubject = groundTruthArray[sub, :, :, :, :].squeeze() # Remove the channel dimension
+        whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
+        greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
+        maxSliceSubject = maxSlice[sub, :].squeeze()
+        print('Subject ', sub)
+
+        if batchSubjects:
+            # Divido el dataSet
+            numBatches = np.round(noisyImagesSubject.shape[0] / batchSubjectsSize).astype(int)
+            # Run the model for all the slices:
+            for i in range(numBatches):
+                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(
+                noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
+            ndaOutputModel = outModel
+        else:
+            outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
+            # Convert it into numpy:
+            ndaOutputModel = outModel.detach().numpy()
+
+        ndaOutputModel = ndaOutputModel.squeeze()  # Remove the channel dimension
+        # Unnormalize if using normalization:
+        if normalizeInput:
+            ndaOutputModel = ndaOutputModel * maxSliceSubject[:,None,None]
+
+        if saveModelOutputAsNiftiImage:
+            image = sitk.GetImageFromArray(np.array(ndaOutputModel))
+            image.SetSpacing(voxelSize)
+            nameImage = 'Subject' + str(sub+1) + '_dose_' + str(lowDose_perc) + '_OutModel_' + modelName[-1]  + '.nii'
+            save_path = os.path.join(pathSaveResults, nameImage)
+            sitk.WriteImage(image, save_path)
+
+        if saveModelOutputAsNiftiImageOneSubject and (analisisSub == (sub+1)) :
+            image = sitk.GetImageFromArray(np.array(ndaOutputModel))
+            image.SetSpacing(voxelSize)
+            nameImage = 'Subject' + str(sub+1) +'_dose_'+str(lowDose_perc)+'_OutModel_'+modelName[-1]+'.nii'
+            save_path = os.path.join(pathSaveResults, nameImage)
+            sitk.WriteImage(image, save_path)
+
+        if sub == analisisSub:
+            outputSub = ndaOutputModel[analisisSlice,:,:]
+        # Compute metrics for each slice:
+        greyMaskedImage = (ndaOutputModel * greyMaskSubject)
+        whiteMaskedImage = (ndaOutputModel * whiteMaskSubject)
+
+        # Compute metrics for each subject all slices:
+        allModelsMeanGM[contModel,sub,:] = meanPerSlice((greyMaskedImage.reshape(greyMaskedImage.shape[0], -1)))
+        allModelsMeanWM[contModel, sub, :] = meanPerSlice((whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1)))
+        allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
+        allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
+        allModelsMsePerSlice[contModel,sub,:] = mseValuePerSlice(ndaOutputModel,groundTruthSubject)
+        allModelsGreyMatterMsePerSlice[contModel, sub, :] = mseValuePerSlice(greyMaskedImage, (groundTruthSubject*greyMaskSubject))
+
+        # Compute metrics for all subject :
+        allModelsCRCperSubject[contModel,sub] = crcValuePerSubject(ndaOutputModel,greyMaskSubject,whiteMaskSubject)
+        allModelsCOVperSubject[contModel,sub] = covValuePerSubject(ndaOutputModel, greyMaskSubject)
+        allModelsMeanGMperSubject[contModel, sub] = meanPerSubject(allModelsMeanGM[contModel, sub, :])
+        allModelsMeanWMperSubject[contModel, sub] = meanPerSubject(allModelsMeanWM[contModel, sub, :])
+        allModelsMsePerSubject[contModel, sub] = mseValuePerSubject(ndaOutputModel, groundTruthSubject)
+        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,
+                                                                                 (groundTruthSubject * greyMaskSubject))
+
+    # Resultados globales
+
+    allModelsCOVGlobal[contModel] = np.mean(allModelsCOVperSubject[contModel,:])
+    allModelsCRCGlobal[contModel] = np.mean(allModelsCRCperSubject[contModel,:])
+    allModelsMeanGMGlobal[contModel] = np.mean(allModelsMeanGMperSubject[contModel,:])
+    allModelsMeanWMGlobal[contModel] = np.mean(allModelsMeanWMperSubject[contModel,:])
+    allModelsMseGlobal[contModel] = np.mean(allModelsMsePerSubject[contModel, :])
+    allModelsGreyMatterMseGlobal[contModel] = np.mean(allModelsGreyMatterMsePerSubject[contModel, :])
+
+    contModel = contModel + 1
 
 # Input images
 meanGreyMatterInputImagePerSlice = np.zeros((noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
@@ -271,18 +383,18 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         if saveFilterOutputAsNiftiImage:
             image = sitk.GetImageFromArray(np.array(filter))
             image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
+            nameImage = 'Subject' + str(sub+1) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
-        if saveFilterOutputAsNiftiImageOneSubject and (analisisSub == sub) :
+        if saveFilterOutputAsNiftiImageOneSubject and (analisisSub == (sub+1)) :
             image = sitk.GetImageFromArray(np.array(filter))
             image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
+            nameImage = 'Subject' + str(sub+1) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
-        if sub == analisisSub:
+        if (sub+1) == analisisSub:
             filterSub.append(filter[analisisSlice,:,:])
 
         mseFilterPerSlice[fil,sub,:]=mseValuePerSlice(filter,groundTruthSubject)
@@ -311,111 +423,6 @@ for sub in range(0, len(noisyImagesArrayOrig)):
 
         mseFilterGlobal[fil] = np.mean(mseFilterPerSubject[fil,:])
         mseGreyMatterFilterGlobal[fil] =  np.mean(mseGreyMatterFilterPerSubject[fil,:])
-
-# Input images + models
-allModelsCrc = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsCov = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsMeanGM = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsMeanWM = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsMeanGMperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
-allModelsMeanWMperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
-allModelsCOVperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
-allModelsCRCperSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
-allModelsMsePerSlice = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsMsePerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
-allModelsGreyMatterMsePerSlice = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-allModelsGreyMatterMsePerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
-
-# Resultados globales
-allModelsCOVGlobal = np.zeros((len(modelFilenames), 1))
-allModelsCRCGlobal = np.zeros((len(modelFilenames), 1))
-allModelsMeanGMGlobal = np.zeros((len(modelFilenames), 1))
-allModelsMeanWMGlobal = np.zeros((len(modelFilenames), 1))
-allModelsMseGlobal = np.zeros((len(modelFilenames), 1))
-allModelsGreyMatterMseGlobal = np.zeros((len(modelFilenames), 1))
-
-outModel = np.zeros((noisyImagesArray.shape[1], 1,noisyImagesArray.shape[3], noisyImagesArray.shape[3]))
-for modelFilename in modelFilenames:
-    model.load_state_dict(torch.load(modelsPath + modelFilename, map_location=torch.device(device)))
-    modelName.append(modelFilename)
-
-    print('Model',contModel+1)
-
-    for sub in range(0, len(noisyImagesArray)):
-        # Get images for one subject as a torch tensor:
-        noisyImagesSubject = noisyImagesArray[sub, :, :, :, :]
-        groundTruthSubject = groundTruthArray[sub, :, :, :, :].squeeze() # Remove the channel dimension
-        whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
-        greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
-        maxSliceSubject = maxSlice[sub, :].squeeze()
-        print('Subject ', sub)
-
-        if batchSubjects:
-            # Divido el dataSet
-            numBatches = np.round(noisyImagesSubject.shape[0] / batchSubjectsSize).astype(int)
-            # Run the model for all the slices:
-            for i in range(numBatches):
-                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(
-                noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
-            ndaOutputModel = outModel
-        else:
-            outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
-            # Convert it into numpy:
-            ndaOutputModel = outModel.detach().numpy()
-
-        ndaOutputModel = ndaOutputModel.squeeze()  # Remove the channel dimension
-        # Unnormalize if using normalization:
-        if normalizeInput:
-            ndaOutputModel = ndaOutputModel * maxSliceSubject[:,None,None]
-
-        if saveModelOutputAsNiftiImage:
-            image = sitk.GetImageFromArray(np.array(ndaOutputModel))
-            image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) + '_dose_' + str(lowDose_perc) + '_OutModel_' + modelName[-1]  + '.nii'
-            save_path = os.path.join(pathSaveResults, nameImage)
-            sitk.WriteImage(image, save_path)
-
-        if saveModelOutputAsNiftiImageOneSubject and (analisisSub == sub) :
-            image = sitk.GetImageFromArray(np.array(filter))
-            image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_OutModel_'+str(fil)+'.nii'
-            save_path = os.path.join(pathSaveResults, nameImage)
-            sitk.WriteImage(image, save_path)
-
-        if sub == analisisSub:
-            outputSub = ndaOutputModel[analisisSlice,:,:]
-        # Compute metrics for each slice:
-        greyMaskedImage = (ndaOutputModel * greyMaskSubject)
-        whiteMaskedImage = (ndaOutputModel * whiteMaskSubject)
-
-        # Compute metrics for each subject all slices:
-        allModelsMeanGM[contModel,sub,:] = meanPerSlice((greyMaskedImage.reshape(greyMaskedImage.shape[0], -1)))
-        allModelsMeanWM[contModel, sub, :] = meanPerSlice((whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1)))
-        allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
-        allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
-        allModelsMsePerSlice[contModel,sub,:] = mseValuePerSlice(ndaOutputModel,groundTruthSubject)
-        allModelsMsePerSlice[contModel, sub, :] = mseValuePerSlice(ndaOutputModel, groundTruthSubject)
-        allModelsGreyMatterMsePerSlice[contModel, sub, :] = mseValuePerSlice(greyMaskedImage, (groundTruthSubject*greyMaskSubject))
-
-        # Compute metrics for all subject :
-        allModelsCRCperSubject[contModel,sub] = crcValuePerSubject(ndaOutputModel,greyMaskSubject,whiteMaskSubject)
-        allModelsCOVperSubject[contModel,sub] = covValuePerSubject(ndaOutputModel, greyMaskSubject)
-        allModelsMeanGMperSubject[contModel, sub] = meanPerSubject(allModelsMeanGM[contModel, sub, :])
-        allModelsMeanWMperSubject[contModel, sub] = meanPerSubject(allModelsMeanWM[contModel, sub, :])
-        allModelsMsePerSubject[contModel, sub] = mseValuePerSubject(ndaOutputModel, groundTruthSubject)
-        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,
-                                                                                 (groundTruthSubject * greyMaskSubject))
-
-    # Resultados globales
-
-    allModelsCOVGlobal[contModel] = np.mean(allModelsCOVperSubject[contModel,:])
-    allModelsCRCGlobal[contModel] = np.mean(allModelsCRCperSubject[contModel,:])
-    allModelsMeanGMGlobal[contModel] = np.mean(allModelsMeanGMperSubject[contModel,:])
-    allModelsMeanWMGlobal[contModel] = np.mean(allModelsMeanWMperSubject[contModel,:])
-    allModelsMseGlobal[contModel] = np.mean(allModelsMsePerSubject[contModel, :])
-    allModelsGreyMatterMseGlobal[contModel] = np.mean(allModelsGreyMatterMsePerSubject[contModel, :])
-
-    contModel = contModel + 1
 
 # Show plot
 if showGlobalPlots == True:
