@@ -92,7 +92,8 @@ lowDoseSubdir = str(lowDose_perc)
 pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
-model = UnetWithResidual(1,1)
+model = Unet()
+#model = UnetWithResidual(1,1)
 #model = Unet(1,1)
 
 
