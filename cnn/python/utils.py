@@ -155,12 +155,12 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             lossValuesTrainingSetEpoch.append(loss.item())
             iterationNumbers.append(iter)
 
-            if i % printStep_batches == (printStep_batches - 1):  # print every printStep mini-batches
+            if (i % printStep_batches) == (printStep_batches - 1):  # print every printStep mini-batches
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss))
                 running_loss = 0.0
 
-            if i % plotStep_batches == (plotStep_batches - 1):
+            if (i % plotStep_batches) == (plotStep_batches - 1):
                 x = np.arange(0, len(lossValuesTrainingSet))
                 y1 = lossValuesTrainingSet
                 plt.figure(figBatches)
@@ -231,14 +231,14 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = outputPath + name + '_{}_{}_best_fit'.format(timestamp, epoch)
+            model_path = outputPath + '\\models\\' +  name + '_{}_{}_best_fit'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
         if (i % printStep_epochs) == (printStep_epochs - 1):
             print('[Epoch {0}. Time: {1}.]. Training loss: {2}. Validation loss: {3}'.format(epoch, datetime.now(),lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
         if (save == True) and (epoch%saveInterval_epochs == 0):
-            model_path = outputPath + name + '_{}_{}'.format(timestamp, epoch)
+            model_path = outputPath + '\\models\\' + '_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
             nameArch = outputPath + name + '_lossValuesTrainingSetBatch_{0}'.format(epoch) + '.xlsx'

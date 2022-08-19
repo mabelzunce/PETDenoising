@@ -20,7 +20,7 @@ from torch.utils.tensorboard import SummaryWriter
 from datetime import datetime
 from utils import trainModel
 from utils import reshapeDataSet
-from unet import Unet
+from unetM import Unet
 from unet import UnetWithResidual
 
 ######################### CHECK DEVICE ######################
@@ -31,18 +31,23 @@ print(device)
 batchSize = 8
 epochs = 100
 learning_rate=0.00005
-normalizeInput = False
-nameThisNet = 'UnetWithResidual_MSE_lr{0}_AlignTrue'.format(learning_rate)
+printStep_epochs = 1
+plotStep_epochs = 1
+printStep_batches = 5
+plotStep_batches = 500
+
+normalizeInput = True
+nameThisNet = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameThisNet = nameThisNet + '_norm'
 
-outputPath = '../../../Results/' + nameThisNet + './'
+outputPath = '../../results/' + nameThisNet + '/'
 if not os.path.exists(outputPath):
     os.makedirs(outputPath)
 
 # Importo base de datos ...
 path = os.getcwd() + '/' #
-path = 'D:/UNSAM/PET/BrainWebSimulations/'
+path = '../../data/BrainWebSimulations/'
 lowDose_perc = 5
 actScaleFactor = 100/lowDose_perc
 
@@ -59,9 +64,9 @@ trainNoisyDataSet = []
 validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
-#unet = Unet()
+unet = Unet()
 #unet = Unet(1, 1)
-unet = UnetWithResidual(1, 1)
+#unet = UnetWithResidual(1, 1)
 
 rng = np.random.default_rng()
 #ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)
@@ -198,8 +203,9 @@ optimizer = optim.Adam(unet.parameters(), lr=learning_rate)
 
 
 lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer, batchSize,
-                                                                                            epochs, device, save = True, outputPath=outputPath,name = nameThisNet,
-                                                                                            printStep_epochs = 1, plotStep_epochs = 1)
+                                                                                            epochs, device, pre_trained = False, save = True, outputPath=outputPath,name = nameThisNet,
+                                                                                            printStep_batches = printStep_batches, plotStep_batches = plotStep_batches,
+                                                                                            printStep_epochs = printStep_epochs, plotStep_epochs = plotStep_epochs)
 
 df = pd.DataFrame(lossValuesTraining)
 df.to_excel('lossValuesTrainingSetBatchModel6Total.xlsx')

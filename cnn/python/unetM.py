@@ -69,21 +69,21 @@ class Unet(nn.Module):
         self.Layer2Down = DownConv(32, 64)
         self.Layer3Down = DownConv(64, 128)
         self.Layer4Down = DownConv(128, 256)
-        #self.Layer5Down = DownConv(256, 512)
+        self.Layer5Down = DownConv(256, 512)
 
-        #self.Middle = DownConv(512, 512)
-        self.Middle = DownConv(256, 512)
+        self.Middle = DownConv(512, 512)
+        #self.Middle = DownConv(256, 256)
 
-        #self.Layer1Up = UpConv(1024, 256)
-        #self.Layer2Up = UpConv(512, 128)
-        #self.Layer3Up = UpConv(256, 64)
-        #self.Layer4Up = UpConv(128, 64)
-        #self.Layer5Up = UpConv(64 + 32, 32)
+        self.Layer1Up = UpConv(1024, 256)
+        self.Layer2Up = UpConv(512, 128)
+        self.Layer3Up = UpConv(256, 64)
+        self.Layer4Up = UpConv(128, 64)
+        self.Layer5Up = UpConv(64 + 32, 32)
 
-        self.Layer1Up = UpConv(512, 128)
-        self.Layer2Up = UpConv(256, 64)
-        self.Layer3Up = UpConv(128, 64)
-        self.Layer4Up = UpConv(64 + 32, 32)
+        #self.Layer1Up = UpConv(512, 128)
+        #self.Layer2Up = UpConv(256, 64)
+        #self.Layer3Up = UpConv(128, 64)
+        #self.Layer4Up = UpConv(64 + 32, 32)
 
         self.MaxPool = MaxPool()
 
@@ -103,18 +103,18 @@ class Unet(nn.Module):
         conv4 = self.Layer4Down(maxPool3)
         maxPool4 = self.MaxPool(conv4)
 
-        #conv5 = self.Layer5Down(maxPool4)
-        #maxPool5 = self.MaxPool(conv5)
+        conv5 = self.Layer5Down(maxPool4)
+        maxPool5 = self.MaxPool(conv5)
 
-        middle = self.Middle(maxPool4)
+        middle = self.Middle(maxPool5)
 
         # Up
-        up1 = self.Layer1Up(middle, conv4)
-        up2 = self.Layer2Up(up1, conv3)
-        up3 = self.Layer3Up(up2, conv2)
-        up4 = self.Layer4Up(up3, conv1)
-        #up5 = self.Layer5Up(up4, conv1)
+        up1 = self.Layer1Up(middle, conv5)
+        up2 = self.Layer2Up(up1, conv4)
+        up3 = self.Layer3Up(up2, conv3)
+        up4 = self.Layer4Up(up3, conv2)
+        up5 = self.Layer5Up(up4, conv1)
 
-        outUNet = self.Out(up4)
+        outUNet = self.Out(up5)
 
         return outUNet

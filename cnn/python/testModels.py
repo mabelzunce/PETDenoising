@@ -75,21 +75,21 @@ path = os.getcwd()
 
 # model
 nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-#nameModel = 'Model3Version2_norm'
-#modelsPath = '../../../Results/' + nameModel + '/Models/'
-modelsPath = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '/Models/'
+nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+
+modelsPath = '../../results/' + nameModel + '/models/'
+
+
 modelFilename = modelsPath + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
 
 # Data path
-#dataPath = 'D:/UNSAM/PET/BrainWebSimulations/'
+dataPath = '../../data/BrainWebSimulations/'
 
-dataPath = 'C:/Users/Encargado/Desktop/Milagros/NewDataset/'
 groundTruthSubdir = '100'
 lowDoseSubdir = str(lowDose_perc)
 
 # Output
-pathSaveResults = 'C:/Users/Encargado/Desktop/Milagros/Results/' + nameModel + '/'
-#pathSaveResults = '../../../Results/' + nameModel + '/'
+pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
 model = UnetWithResidual(1,1)
@@ -141,16 +141,16 @@ for element in arrayGroundTruth:
     noisyDataSet = reshapeDataSet(noisyDataSet)
 
     # read greyMask
-    #nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
-    nameGreyMask = 'Subject' + name + 'GreyMask.nii'
+    nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
+    #nameGreyMask = 'Subject' + name + 'GreyMask.nii'
     pathGreyMaskElement = pathPhantoms + '/' + nameGreyMask
     greyMask = sitk.ReadImage(pathGreyMaskElement)
     greyMask = sitk.GetArrayFromImage(greyMask)
     greyMask = reshapeDataSet(greyMask)
 
     # read whiteMask
-    #nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
-    nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
+    nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
+    #nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
     pathWhiteMaskElement = pathPhantoms + '/' + nameWhiteMask
     whiteMask = sitk.ReadImage(pathWhiteMaskElement)
     whiteMask = sitk.GetArrayFromImage(whiteMask)
