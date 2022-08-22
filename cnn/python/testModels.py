@@ -4,23 +4,14 @@ import skimage
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
-#from unetM import Unet
-from unet import Unet
-from unet import UnetWithResidual
-from utils import imshow
+from unetM import Unet
+#from unet import Unet
+#from unet import UnetWithResidual
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
-from utils import torchToNp
-from utils import mseAntDspModelTorchSlice
-from utils import testModelSlice
-from utils import obtenerMask
 from utils import showDataPlot
 from utils import showPlotGlobalData
-from utils import saveNumpyAsNii
-from utils import getTestOneModelOneSlices
-from utils import covValue
-from utils import crcValue
 from utils import covValuePerSlice
 from utils import crcValuePerSlice
 from utils import crcValuePerSubject
@@ -74,13 +65,10 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+# nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
+nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
 
 modelsPath = '../../results/' + nameModel + '/models/'
-
-
-modelFilename = modelsPath + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
 
 # Data path
 dataPath = '../../data/BrainWebSimulations/'

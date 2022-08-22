@@ -559,7 +559,7 @@ def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,n
     dspFiltros = filtersImages
     cantFiltros = filtersImages.shape[0]
 
-    if antes.shape == ():
+    if modelsImages.shape[0] == 1:
         antes = np.repeat(antes, cantModels, axis=0)
         modelPlot = dspModel.flatten()
         y.append(antes)
@@ -572,23 +572,52 @@ def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,n
             name = names[2] + str(sigmas[fil])
             namesGraph.append(name)
 
-        x = np.arange(0, len(dspModel))
+
+        x = np.arange(0, len(y))
+        plt.scatter(x, y,label = namesGraph)
+
+        plt.legend(loc="upper left")
+        plt.xlabel(namesGraph)
+        plt.show()
         plt.figure()
 
-        for graf in range(0, len(y)):
-            y1 = y[graf]
-            plt.plot(x, y1, label = namesGraph[graf])
-
-            plt.legend(loc="upper left")
-
-        plt.xticks(x,namesModel)
-        plt.show(block=False)
-        plt.title(graphName)
-        plt.draw()
-        plt.pause(0.0001)
-
+        #x = np.arange(0, len(y))
+        #plt.bar(x[0], y[0], label=namesGraph)
+        #plt.legend(loc="upper left")
+        #plt.xlabel(namesGraph)
+        #plt.show()
+        #plt.figure()
     else:
-        print("No son valores globales")
+        if antes.shape == ():
+            antes = np.repeat(antes, cantModels, axis=0)
+            modelPlot = dspModel.flatten()
+            y.append(antes)
+            y.append(modelPlot)
+            namesGraph.append(names[1])
+            for fil in range(0, cantFiltros):
+                filterPlot = dspFiltros[fil]
+                filterPlot = np.repeat(filterPlot, cantModels, axis=0)
+                y.append(filterPlot)
+                name = names[2] + str(sigmas[fil])
+                namesGraph.append(name)
+
+            x = np.arange(0, len(dspModel))
+            plt.figure()
+
+            for graf in range(0, len(y)):
+                y1 = y[graf]
+                plt.plot(x, y1, label = namesGraph[graf])
+
+                plt.legend(loc="upper left")
+
+            plt.xticks(x,namesModel)
+            plt.show(block=False)
+            plt.title(graphName)
+            plt.draw()
+            plt.pause(0.0001)
+
+        else:
+            print("No son valores globales")
 
     if saveFig == True:
         plt.savefig(pathSave + graphName)
@@ -655,10 +684,14 @@ def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,n
     if saveFig == True:
         plt.savefig(pathSave + graphName)
 
+
+
 def saveDataCsv(listToSave,name,path):
     cantDims = listToSave.ndim
     if cantDims <= 2:
         pathSave = path + name
+        if listToSave.shape == ():
+            listToSave = np.reshape(listToSave, (1, 1))
         pd.DataFrame(np.array(listToSave)).to_csv(pathSave)
     else:
         newArray = listToSave[0, :, :]
