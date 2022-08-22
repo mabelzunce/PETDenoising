@@ -38,10 +38,12 @@ trainingSubjects = allSubjects
 for i in validSubjects:
     trainingSubjects.remove(i)
 
+calculateOnlyValidSubjectMetrics = False
+calculateOnlyTrainingSubjectMetrics = True
+calculateAllSubjectMetrics = False
+
 # Subject
-analisisSub = 5
-analisisSlice = 80
-#
+
 batchSubjects = True
 batchSubjectsSize = 20
 # Results visualization
@@ -104,6 +106,24 @@ noisyImagesArray = []
 greyMaskArray = []
 whiteMaskArray = []
 
+# Conjunto
+if calculateOnlyValidSubjectMetrics:
+    idxConjunto = validSubjects
+    conjuntoAnalisis = 'ValidSubjects'
+    analisisSub = 3
+
+if calculateOnlyTrainingSubjectMetrics:
+    idxConjunto = trainingSubjects
+    conjuntoAnalisis = 'TrainingSubjects'
+    analisisSub = 5
+
+if calculateAllSubjectMetrics:
+    idxConjunto = None
+    conjuntoAnalisis = 'AllSubjects'
+    analisisSub = 5
+
+analisisSlice = 80
+
 # leo los dataSet
 for element in arrayGroundTruth:
     pathGroundTruthElement = pathGroundTruth+'/'+element
@@ -122,34 +142,38 @@ for element in arrayGroundTruth:
     ind = name.find('Subject')
     name = name[ind + len('Subject'):]
 
-    # read noisyDataSet
-    nametrainNoisyDataSet = 'noisyDataSet' + str(lowDose_perc) + '_Subject' + name + '.nii'
-    pathNoisyDataSetElement = pathNoisyDataSet + '/' + nametrainNoisyDataSet
-    noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
-    noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
-    noisyDataSet = reshapeDataSet(noisyDataSet)
+    prueba = []
 
-    # read greyMask
-    nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
-    #nameGreyMask = 'Subject' + name + 'GreyMask.nii'
-    pathGreyMaskElement = pathPhantoms + '/' + nameGreyMask
-    greyMask = sitk.ReadImage(pathGreyMaskElement)
-    greyMask = sitk.GetArrayFromImage(greyMask)
-    greyMask = reshapeDataSet(greyMask)
+    if int(name) in idxConjunto:
+        print(name)
+        # read noisyDataSet
+        nametrainNoisyDataSet = 'noisyDataSet' + str(lowDose_perc) + '_Subject' + name + '.nii'
+        pathNoisyDataSetElement = pathNoisyDataSet + '/' + nametrainNoisyDataSet
+        noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
+        noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
+        noisyDataSet = reshapeDataSet(noisyDataSet)
 
-    # read whiteMask
-    nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
-    #nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
-    pathWhiteMaskElement = pathPhantoms + '/' + nameWhiteMask
-    whiteMask = sitk.ReadImage(pathWhiteMaskElement)
-    whiteMask = sitk.GetArrayFromImage(whiteMask)
-    whiteMask = reshapeDataSet(whiteMask)
+        # read greyMask
+        nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
+        #nameGreyMask = 'Subject' + name + 'GreyMask.nii'
+        pathGreyMaskElement = pathPhantoms + '/' + nameGreyMask
+        greyMask = sitk.ReadImage(pathGreyMaskElement)
+        greyMask = sitk.GetArrayFromImage(greyMask)
+        greyMask = reshapeDataSet(greyMask)
 
-    nameGroundTruth.append(name)
-    groundTruthArray.append(groundTruth)
-    noisyImagesArray.append(noisyDataSet)
-    greyMaskArray.append(greyMask)
-    whiteMaskArray.append(whiteMask)
+        # read whiteMask
+        nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
+        #nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
+        pathWhiteMaskElement = pathPhantoms + '/' + nameWhiteMask
+        whiteMask = sitk.ReadImage(pathWhiteMaskElement)
+        whiteMask = sitk.GetArrayFromImage(whiteMask)
+        whiteMask = reshapeDataSet(whiteMask)
+
+        nameGroundTruth.append(name)
+        groundTruthArray.append(groundTruth)
+        noisyImagesArray.append(noisyDataSet)
+        greyMaskArray.append(greyMask)
+        whiteMaskArray.append(whiteMask)
 
 noisyImagesArray = np.array(noisyImagesArray)
 groundTruthArray = np.array(groundTruthArray)
@@ -473,22 +497,22 @@ if showImageSub == True:
     plt.savefig(pathSaveResults + 'ResultsModel')
 
 if saveDataCSV == True:
-    saveDataCsv(meanGreyMatterFilterGlobal, 'meanGreyMatterFilterGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(meanGreyMatterInputImageGlobal, 'meanGreyMatterInputImageGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(allModelsMeanGMGlobal, 'meanGreyMatterAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(meanGreyMatterFilterGlobal, 'meanGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(meanGreyMatterInputImageGlobal, 'meanGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(allModelsMeanGMGlobal, 'meanGreyMatterAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
 
-    saveDataCsv(covFilterGlobal, 'covFilterGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(covInputImageGlobal, 'covInputImageGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(allModelsCOVGlobal, 'covAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(covFilterGlobal, 'covFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(covInputImageGlobal, 'covInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(allModelsCOVGlobal, 'covAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
 
-    saveDataCsv(crcFilterGlobal, 'crcFilterGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(crcInputImageGlobal, 'crcInputImageGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(allModelsCRCGlobal, 'crcAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(crcFilterGlobal, 'crcFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(crcInputImageGlobal, 'crcInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(allModelsCRCGlobal, 'crcAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
 
-    saveDataCsv(mseFilterGlobal, 'mseFilterGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(mseInputImageGlobal, 'mseInputImageGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(allModelsMseGlobal, 'mseAllModelsGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(mseFilterGlobal, 'mseFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(mseInputImageGlobal, 'mseInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(allModelsMseGlobal, 'mseAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
 
-    saveDataCsv(mseGreyMatterFilterGlobal, 'mseGreyMatterFilterGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(mseGreyMatterInputImageGlobal, 'mseGreyMatterInputImageGlobal'+nameModel+'.csv', pathSaveResults)
-    saveDataCsv(allModelsGreyMatterMseGlobal, 'allModelsGreyMatterMseGlobal'+nameModel+'.csv', pathSaveResults)
+    saveDataCsv(mseGreyMatterFilterGlobal, 'mseGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(mseGreyMatterInputImageGlobal, 'mseGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(allModelsGreyMatterMseGlobal, 'allModelsGreyMatterMseGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)

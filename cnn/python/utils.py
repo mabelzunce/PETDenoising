@@ -576,7 +576,7 @@ def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,n
         x = np.arange(0, len(y))
         plt.scatter(x, y,label = namesGraph)
 
-        plt.legend(loc="upper left")
+        plt.legend(loc="lower left")
         plt.xlabel(namesGraph)
         plt.show()
         plt.figure()
@@ -608,7 +608,7 @@ def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,n
                 y1 = y[graf]
                 plt.plot(x, y1, label = namesGraph[graf])
 
-                plt.legend(loc="upper left")
+                plt.legend(loc="lower left")
 
             plt.xticks(x,namesModel)
             plt.show(block=False)
@@ -674,7 +674,7 @@ def showDataPlot(antesImages,modelsImages,filtersImages,sigmas,graphName,names,n
         y1 = y[graf]
         plt.plot(x, y1, label = namesGraph[graf])
 
-        plt.legend(loc="upper left")
+        plt.legend(loc="lower left")
 
     plt.show(block=False)
     plt.title(graphName)
