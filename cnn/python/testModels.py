@@ -38,8 +38,8 @@ trainingSubjects = allSubjects
 for i in validSubjects:
     trainingSubjects.remove(i)
 
-calculateOnlyValidSubjectMetrics = False
-calculateOnlyTrainingSubjectMetrics = True
+calculateOnlyValidSubjectMetrics = True
+calculateOnlyTrainingSubjectMetrics = False
 calculateAllSubjectMetrics = False
 
 # Subject
@@ -49,7 +49,7 @@ batchSubjectsSize = 20
 # Results visualization
 showGlobalPlots = True
 showPerfilSlices = True
-showImageSub = True
+showImageSub = False
 # Save results
 saveModelOutputAsNiftiImage = False
 saveModelOutputAsNiftiImageOneSubject = True
@@ -110,7 +110,7 @@ whiteMaskArray = []
 if calculateOnlyValidSubjectMetrics:
     idxConjunto = validSubjects
     conjuntoAnalisis = 'ValidSubjects'
-    analisisSub = 3
+    analisisSub = 2
 
 if calculateOnlyTrainingSubjectMetrics:
     idxConjunto = trainingSubjects
@@ -247,7 +247,7 @@ for sub in range(0, len(noisyImagesArrayOrig)):
     groundTruthSubject = groundTruthArray[sub, :, :, :, :].squeeze() # Remove the channel dimension
     whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
     greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
-    print('Subject ', sub)
+    print('Subject ', idxConjunto[sub])
     # calculo los filtros
     # los voy a guardar
 
@@ -284,18 +284,18 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         if saveFilterOutputAsNiftiImage:
             image = sitk.GetImageFromArray(np.array(filter))
             image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
+            nameImage = 'Subject' + str(nameGroundTruth[sub]) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
-        if saveFilterOutputAsNiftiImageOneSubject and (analisisSub == sub) :
+        if saveFilterOutputAsNiftiImageOneSubject and (analisisSub == int(nameGroundTruth[sub])):
             image = sitk.GetImageFromArray(np.array(filter))
             image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
+            nameImage = 'Subject' + str(nameGroundTruth[sub]) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
-        if sub == analisisSub:
+        if int(nameGroundTruth[sub]) == analisisSub:
             filterSub.append(filter[analisisSlice,:,:])
 
         mseFilterPerSlice[fil,sub,:]=mseValuePerSlice(filter,groundTruthSubject)
@@ -361,7 +361,7 @@ for modelFilename in modelFilenames:
         whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
         greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
         maxSliceSubject = maxSlice[sub, :].squeeze()
-        print('Subject ', sub)
+        print('Subject ', idxConjunto[sub])
 
         if batchSubjects:
             # Divido el dataSet
@@ -384,18 +384,18 @@ for modelFilename in modelFilenames:
         if saveModelOutputAsNiftiImage:
             image = sitk.GetImageFromArray(np.array(ndaOutputModel))
             image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) + '_dose_' + str(lowDose_perc) + '_OutModel_' + modelName[-1]  + '.nii'
+            nameImage = 'Subject' + str(nameGroundTruth[sub]) + '_dose_' + str(lowDose_perc) + '_OutModel_' + modelName[-1]  + '.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
-        if saveModelOutputAsNiftiImageOneSubject and (analisisSub == sub) :
-            image = sitk.GetImageFromArray(np.array(filter))
+        if saveModelOutputAsNiftiImageOneSubject and (analisisSub == int(nameGroundTruth[sub])):
+            image = sitk.GetImageFromArray(np.array(ndaOutputModel))
             image.SetSpacing(voxelSize)
-            nameImage = 'Subject' + str(sub) +'_dose_'+str(lowDose_perc)+'_OutModel_'+str(fil)+'.nii'
+            nameImage = 'Subject' + str(nameGroundTruth[sub]) +'_dose_'+str(lowDose_perc)+'_OutModel_'+modelName[-1] +'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
-        if sub == analisisSub:
+        if int(nameGroundTruth[sub]) == analisisSub:
             outputSub = ndaOutputModel[analisisSlice,:,:]
         # Compute metrics for each slice:
         greyMaskedImage = (ndaOutputModel * greyMaskSubject)
@@ -461,8 +461,6 @@ if showPerfilSlices == True:
                  names=namesPlot,namesModel = modelName, saveFig = True, pathSave=pathSaveResults)
 
 if showImageSub == True:
-    filterSub
-    outputSub
     noisySub = noisyImagesArray[analisisSub, analisisSlice, 0, :, :]
     gtSub = groundTruthArray[analisisSub, analisisSlice, 0, :, :]
     totalImg = [gtSub, noisySub]
