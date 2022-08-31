@@ -5,8 +5,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
 from unetM import Unet
-#from unet import Unet
-#from unet import UnetWithResidual
+from unet import UnetWithResidual
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
@@ -67,8 +66,8 @@ print(device)
 path = os.getcwd()
 
 # model
-# nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
+nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
+#nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -82,10 +81,8 @@ lowDoseSubdir = str(lowDose_perc)
 pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
-model = Unet()
-#model = UnetWithResidual(1,1)
-#model = Unet(1,1)
-
+#model = Unet()
+model = UnetWithResidual(1,1)
 
 ########## LIST OF MODELS ###############
 modelFilenames = os.listdir(modelsPath)
@@ -238,6 +235,7 @@ mseGreyMatterFilterGlobal = np.zeros((len(filters)))
 meanGreyMatterFilterGlobal = np.zeros((len(filters)))
 meanWhiteMatterFilterGlobal = np.zeros((len(filters)))
 
+filters = [2,3,4]
 
 filterSub = []
 
@@ -271,10 +269,12 @@ for sub in range(0, len(noisyImagesArrayOrig)):
     meanWhiteMatterInputImagePerSubject[sub] = meanPerSubject(meanWhiteMatterInputImagePerSlice[sub, :])
     meanGreyMatterInputImagePerSubject[sub] = meanPerSubject(meanGreyMatterInputImagePerSlice[sub, :])
 
-    meanGreyMatterInputImageGlobal = meanPerSubject(meanGreyMatterInputImagePerSubject[:])
-    meanWhiteMatterInputImageGlobal = meanPerSubject(meanWhiteMatterInputImagePerSubject[:])
+    meanGreyMatterInputImageGlobal = np.mean(meanGreyMatterInputImagePerSubject[:])
+    meanWhiteMatterInputImageGlobal = np.mean(meanWhiteMatterInputImagePerSubject[:])
     mseInputImageGlobal = np.mean(mseInputImagePerSubject[:])
     mseGreyMatterInputImageGlobal = np.mean(mseGreyMatterInputImagePerSubject[:])
+
+
 
     # METRICAS FILTROS + INPUT IMAGE
     for fil in range(0, len(filters)):
@@ -319,8 +319,8 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         crcFilterGlobal[fil] = np.mean(crcFilterPerSubject[fil,:])
         covFilterGlobal[fil] = np.mean(covFilterPerSubject[fil,:])
 
-        meanGreyMatterFilterGlobal[fil] = meanPerSubject(meanGreyMatterFilterPerSubject[fil, :])
-        meanWhiteMatterFilterGlobal[fil] = meanPerSubject(meanWhiteMatterFilterPerSubject[fil, :])
+        meanGreyMatterFilterGlobal[fil] = np.mean(meanGreyMatterFilterPerSubject[fil, :])
+        meanWhiteMatterFilterGlobal[fil] = np.mean(meanWhiteMatterFilterPerSubject[fil, :])
 
         mseFilterGlobal[fil] = np.mean(mseFilterPerSubject[fil,:])
         mseGreyMatterFilterGlobal[fil] =  np.mean(mseGreyMatterFilterPerSubject[fil,:])
@@ -407,7 +407,6 @@ for modelFilename in modelFilenames:
         allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
         allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
         allModelsMsePerSlice[contModel,sub,:] = mseValuePerSlice(ndaOutputModel,groundTruthSubject)
-        allModelsMsePerSlice[contModel, sub, :] = mseValuePerSlice(ndaOutputModel, groundTruthSubject)
         allModelsGreyMatterMsePerSlice[contModel, sub, :] = mseValuePerSlice(greyMaskedImage, (groundTruthSubject*greyMaskSubject))
 
         # Compute metrics for all subject :
@@ -416,8 +415,7 @@ for modelFilename in modelFilenames:
         allModelsMeanGMperSubject[contModel, sub] = meanPerSubject(allModelsMeanGM[contModel, sub, :])
         allModelsMeanWMperSubject[contModel, sub] = meanPerSubject(allModelsMeanWM[contModel, sub, :])
         allModelsMsePerSubject[contModel, sub] = mseValuePerSubject(ndaOutputModel, groundTruthSubject)
-        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,
-                                                                                 (groundTruthSubject * greyMaskSubject))
+        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,(groundTruthSubject * greyMaskSubject))
 
     # Resultados globales
 
