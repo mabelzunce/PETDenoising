@@ -92,6 +92,9 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     # lossValuesDevSet: loss por batch para validSet
     # lossValuesDevSetAllEpoch: loss por epoca para validSet
 
+    models_output_path = outputPath + '/models/'
+    if not os.path.exists(models_output_path):
+        os.makedirs(models_output_path)
     # Visualization:
     numImagesPerRow = 4
     if plotStep_batches != math.inf:
@@ -231,14 +234,14 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = outputPath + '\\models\\' +  name + '_{}_{}_best_fit'.format(timestamp, epoch)
+            model_path = models_output_path +  name + '_{}_{}_best_fit'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
         if (i % printStep_epochs) == (printStep_epochs - 1):
             print('[Epoch {0}. Time: {1}.]. Training loss: {2}. Validation loss: {3}'.format(epoch, datetime.now(),lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
         if (save == True) and (epoch%saveInterval_epochs == 0):
-            model_path = outputPath + '\\models\\' + '_{}_{}'.format(timestamp, epoch)
+            model_path = models_output_path +  name + '_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
             nameArch = outputPath + name + '_lossValuesTrainingSetBatch_{0}'.format(epoch) + '.xlsx'
