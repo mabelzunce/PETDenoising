@@ -414,7 +414,7 @@ def covValuePerSlice(img, mask):
     meanValuePerSlice = meanPerSlice(masked)
     stdValuePerSlice = stdPerSlice(masked)
 
-    covPerSlice = meanValuePerSlice / stdValuePerSlice
+    covPerSlice = stdValuePerSlice/meanValuePerSlice
     covPerSlice = np.nan_to_num(covPerSlice)
     return covPerSlice
 
@@ -523,21 +523,46 @@ def covValuePerSubject(img, mask):
     meanValuePerSubject = meanPerSubject(masked)
     stdValuePerSubject = stdPerSubject(masked)
 
-    covPerSubject = meanValuePerSubject / stdValuePerSubject
+    covPerSubject = stdValuePerSubject / meanValuePerSubject
     covPerSubject = np.nan_to_num(covPerSubject)
     return covPerSubject
 
 def mseValuePerSlice(image1, image2):
-    cuadradoDeDif = ((image1 - image2) ** 2)
+    # normalizar las imagenes por el valor medio
+    meanImage1 = meanPerSlice(image1).mean(axis=-1)
+    meanImage2 = meanPerSlice(image2).mean(axis=-1)
+
+    normImage1 = image1/meanImage1[:,None,None]
+    normImage2 = image2/ meanImage2[:,None,None]
+
+    normImage1 = np.nan_to_num(normImage1, posinf=0)
+    normImage2 = np.nan_to_num(normImage2, posinf=0)
+
+    cuadradoDeDif = ((normImage1 - normImage2) ** 2)
     suma = np.sum(np.sum(cuadradoDeDif,axis=1),axis=1)
-    cantPix = image2.shape[-1] * image1.shape[-2]  # img1 and 2 should have same shape
+    #cantPix = image2.shape[-1] * image1.shape[-2]# img1 and 2 should have same shape
+    X = np.ma.masked_equal(cuadradoDeDif, 0)
+    cantPix = np.sum(np.sum((~(X.mask)), axis=-1),axis=-1)
     error = suma / cantPix
+    error = np.nan_to_num(error, posinf=0)
     return error
 
 def mseValuePerSubject(image1, image2):
-    cuadradoDeDif = ((image1 - image2) ** 2)
+
+    meanImage1 = np.mean(meanPerSubject(image1))
+    meanImage2 = np.mean(meanPerSubject(image2))
+
+    normImage1 = image1 / meanImage1
+    normImage2 = image2 / meanImage2
+
+    normImage1 = np.nan_to_num(normImage1, posinf=0)
+    normImage2 = np.nan_to_num(normImage2, posinf=0)
+
+    cuadradoDeDif = ((normImage1 - normImage2) ** 2)
+
     suma = np.sum(np.sum(np.sum(cuadradoDeDif,axis=1),axis=1))
-    cantPix = image2.shape[-1] * image1.shape[-2]  # img1 and 2 should have same shape
+    X = np.ma.masked_equal(cuadradoDeDif, 0)
+    cantPix = np.sum(np.sum((~(X.mask)), axis=-1))
     error = suma / cantPix
     return error
 
@@ -581,12 +606,6 @@ def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,n
         plt.show()
         plt.figure()
 
-        #x = np.arange(0, len(y))
-        #plt.bar(x[0], y[0], label=namesGraph)
-        #plt.legend(loc="upper left")
-        #plt.xlabel(namesGraph)
-        #plt.show()
-        #plt.figure()
     else:
         if antes.shape == ():
             antes = np.repeat(antes, cantModels, axis=0)
