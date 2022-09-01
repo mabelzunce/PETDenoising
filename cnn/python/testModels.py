@@ -4,9 +4,9 @@ import skimage
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
-from unetM import Unet
+#from unetM import Unet
 #from unet import Unet
-#from unet import UnetWithResidual
+from unet import UnetWithResidual
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
@@ -67,8 +67,9 @@ print(device)
 path = os.getcwd()
 
 # model
-# nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
+nameModel = 'ResidualUnet4LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
+if normalizeInput:
+    nameModel = nameModel + '_norm'
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -82,8 +83,8 @@ lowDoseSubdir = str(lowDose_perc)
 pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
-model = Unet()
-#model = UnetWithResidual(1,1)
+#model = Unet()
+model = UnetWithResidual(1,1)
 #model = Unet(1,1)
 
 
@@ -152,6 +153,8 @@ for element in arrayGroundTruth:
         noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
         noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
         noisyDataSet = reshapeDataSet(noisyDataSet)
+        # Apply the activity scaling:
+        noisyDataSet = noisyDataSet*actScaleFactor
 
         # read greyMask
         nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'

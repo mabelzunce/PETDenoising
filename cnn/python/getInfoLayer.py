@@ -28,10 +28,14 @@ path = os.getcwd()
 
 # Model:
 learning_rate=0.00005
-nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue_norm'.format(learning_rate)
-#nameModel = 'UnetWithResidual_MSE_lr{0}'.format(learning_rate)
-epoch = 23
-pathModel = '../../../Results/' + nameModel + '/'
+normalizeInput = True
+nameModel = 'UnetWithResidual_MSE_lr{0}_AlignTrue'.format(learning_rate)
+if normalizeInput:
+    nameModel = nameModel + '_norm'
+pathModel = '../../../Results/' + nameModel + '/models/'
+
+nameThisNet = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+
 
 model = UnetWithResidual(1,1)
 modelsPath = pathModel + 'UnetWithResidual_MSE_lr5e-05_AlignTrue_norm_20220715_191324_27_best_fit' #nameModel + str(epoch) + '_best_fit'
@@ -42,7 +46,7 @@ model.load_state_dict(torch.load(modelsPath, map_location=torch.device('cpu')))
 #nameModel = 'UnetWithResidual_MSE_lr5e-05_33_best_fit'
 
 # Data:
-path = 'D:/UNSAM/PET/BrainWebSimulations/'
+path = '../../data/BrainWebSimulations/'
 pathGroundTruth = path+'/100'
 arrayGroundTruth = os.listdir(pathGroundTruth)
 
@@ -83,8 +87,18 @@ for element in arrayNoisyDataSet:
 noisyImagesArray = np.array(noisyImagesArray)
 groundTruthArray = np.array(groundTruthArray)
 
+# Get the maximum value per slice:
+maxSlice = noisyImagesArray[:, :, :, :].max(axis=4).max(axis=3)
+maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
+# Normalize the input if necessary:
+if normalizeInput:
+    noisyImagesArray = noisyImagesArray/maxSlice[:,:,:,None,None]
+    noisyImagesArray = np.nan_to_num(noisyImagesArray)
+
 noisyImagesArray = torch.from_numpy(noisyImagesArray)
 groundTruthArray = torch.from_numpy(groundTruthArray)
+
+
 
 subject = 1
 sliceNro = 32
@@ -109,15 +123,15 @@ model.add_res.register_forward_hook(get_activation('add_res'))
 inputsModel = torch.unsqueeze(noisyImagesArray[subject,sliceNro,:,:,:], dim=0)
 output = model(inputsModel)
 
-showSubplots(torch.unsqueeze(activation['up4'][0,:,:,:], dim=1), 'LayerUp4_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
-showSubplots(torch.unsqueeze(activation['down1'][0,:,:,:], dim=1), 'LayerDown1_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
-showSubplots(torch.unsqueeze(activation['down4'][0,:,:,:], dim=1), 'LayerDown4_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
-showSubplots(torch.unsqueeze(activation['outc'][0,:,:,:], dim=1), 'LayerOutc_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
-showSubplots(torch.unsqueeze(activation['add_res'][0,:,:,:], dim=1), 'LayerAdd_res_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(activation['up4'][0,:,:,:], 'LayerUp4_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(activation['down1'][0,:,:,:], 'LayerDown1_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(activation['down4'][0,:,:,:], 'LayerDown4_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(activation['outc'][0,:,:,:], 'LayerOutc_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots(activation['add_res'][0,:,:,:], 'LayerAdd_res_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
 
-showSubplots(torch.Tensor.numpy(inputsModel[:,:, :, :]), 'Input_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
-showSubplots((torch.Tensor.numpy(output[:,:, :, :].detach())), 'Output_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
-
+showSubplots(torch.Tensor.numpy(inputsModel[:,:, :, :]).squeeze(axis = 1), 'Input_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+showSubplots((torch.Tensor.numpy(output[:,:, :, :].detach())).squeeze(axis = 1), 'Output_Subject'+str(subject)+'_slice'+str(sliceNro)+'Model_'+nameModel)
+plt.show(block=True)
 #model = UnetWithResidual(1,1)
 #modelsPath = path+'/ModeloUnetResidualUno/UnetWithResidual_MSE_lr5e-05_33_best_fit'
 #model.load_state_dict(torch.load(modelsPath, map_location=torch.device('cpu')))
