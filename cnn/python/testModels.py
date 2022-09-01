@@ -153,8 +153,6 @@ for element in arrayGroundTruth:
         noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
         noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
         noisyDataSet = reshapeDataSet(noisyDataSet)
-        # Apply the activity scaling:
-        noisyDataSet = noisyDataSet*actScaleFactor
 
         # read greyMask
         nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
@@ -274,8 +272,8 @@ for sub in range(0, len(noisyImagesArrayOrig)):
     meanWhiteMatterInputImagePerSubject[sub] = meanPerSubject(meanWhiteMatterInputImagePerSlice[sub, :])
     meanGreyMatterInputImagePerSubject[sub] = meanPerSubject(meanGreyMatterInputImagePerSlice[sub, :])
 
-    meanGreyMatterInputImageGlobal = meanPerSubject(meanGreyMatterInputImagePerSubject[:])
-    meanWhiteMatterInputImageGlobal = meanPerSubject(meanWhiteMatterInputImagePerSubject[:])
+    meanGreyMatterInputImageGlobal = np.mean(meanGreyMatterInputImagePerSubject[:])
+    meanWhiteMatterInputImageGlobal = np.mean(meanWhiteMatterInputImagePerSubject[:])
     mseInputImageGlobal = np.mean(mseInputImagePerSubject[:])
     mseGreyMatterInputImageGlobal = np.mean(mseGreyMatterInputImagePerSubject[:])
 
@@ -322,8 +320,8 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         crcFilterGlobal[fil] = np.mean(crcFilterPerSubject[fil,:])
         covFilterGlobal[fil] = np.mean(covFilterPerSubject[fil,:])
 
-        meanGreyMatterFilterGlobal[fil] = meanPerSubject(meanGreyMatterFilterPerSubject[fil, :])
-        meanWhiteMatterFilterGlobal[fil] = meanPerSubject(meanWhiteMatterFilterPerSubject[fil, :])
+        meanGreyMatterFilterGlobal[fil] = np.mean(meanGreyMatterFilterPerSubject[fil, :])
+        meanWhiteMatterFilterGlobal[fil] = np.mean(meanWhiteMatterFilterPerSubject[fil, :])
 
         mseFilterGlobal[fil] = np.mean(mseFilterPerSubject[fil,:])
         mseGreyMatterFilterGlobal[fil] =  np.mean(mseGreyMatterFilterPerSubject[fil,:])
@@ -419,8 +417,7 @@ for modelFilename in modelFilenames:
         allModelsMeanGMperSubject[contModel, sub] = meanPerSubject(allModelsMeanGM[contModel, sub, :])
         allModelsMeanWMperSubject[contModel, sub] = meanPerSubject(allModelsMeanWM[contModel, sub, :])
         allModelsMsePerSubject[contModel, sub] = mseValuePerSubject(ndaOutputModel, groundTruthSubject)
-        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,
-                                                                                 (groundTruthSubject * greyMaskSubject))
+        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,(groundTruthSubject * greyMaskSubject))
 
     # Resultados globales
 
