@@ -417,7 +417,7 @@ def covValuePerSlice(img, mask):
     meanValuePerSlice = meanPerSlice(masked)
     stdValuePerSlice = stdPerSlice(masked)
 
-    covPerSlice = meanValuePerSlice / stdValuePerSlice
+    covPerSlice = stdValuePerSlice / meanValuePerSlice
     covPerSlice = np.nan_to_num(covPerSlice)
     return covPerSlice
 
@@ -455,7 +455,7 @@ def meanPerSlice(masked):
 
 def stdPerSlice(masked):
 
-    stdPerSlice = np.nanstd(np.where(np.isclose(masked, 0), np.nan, masked),axis=1)
+    stdPerSlice = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=1)
     stdPerSlice = np.nan_to_num(stdPerSlice)
     #stdPerSlice.reshape(stdPerSlice.shape[0], 1)
 
@@ -472,11 +472,8 @@ def meanPerSubject(masked):
     return meanPerSlice
 
 def stdPerSubject(masked):
-
-    stdPerSlice = np.nanstd(np.where(np.isclose(masked, 0), np.nan, masked),axis=0)
-    stdPerSlice = np.nan_to_num(stdPerSlice)
-
-    return stdPerSlice
+    stdForNonZeros = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked))
+    return stdForNonZeros
 
 
 def crcValuePerSlice(img, maskGrey, maskWhite):
@@ -526,21 +523,29 @@ def covValuePerSubject(img, mask):
     meanValuePerSubject = meanPerSubject(masked)
     stdValuePerSubject = stdPerSubject(masked)
 
-    covPerSubject = meanValuePerSubject / stdValuePerSubject
+    covPerSubject = stdValuePerSubject / meanValuePerSubject
     covPerSubject = np.nan_to_num(covPerSubject)
     return covPerSubject
 
-def mseValuePerSlice(image1, image2):
-    cuadradoDeDif = ((image1 - image2) ** 2)
+def mseValuePerSlice(image1, image2, mask = []):
+    if mask == []:
+        mask = np.ones(image1.shape)
+    # Force binary mask:
+    mask = mask > 0
+    cuadradoDeDif = ((image1*mask - image2*mask) ** 2)
     suma = np.sum(np.sum(cuadradoDeDif,axis=1),axis=1)
-    cantPix = image2.shape[-1] * image1.shape[-2]  # img1 and 2 should have same shape
+    cantPix = np.sum(mask > 0)
     error = suma / cantPix
     return error
 
-def mseValuePerSubject(image1, image2):
-    cuadradoDeDif = ((image1 - image2) ** 2)
+def mseValuePerSubject(image1, image2, mask = []):
+    if mask == []:
+        mask = np.ones(image1.shape)
+    # Force binary mask:
+    mask = mask > 0
+    cuadradoDeDif = ((image1*mask - image2*mask) ** 2)
     suma = np.sum(np.sum(np.sum(cuadradoDeDif,axis=1),axis=1))
-    cantPix = image2.shape[-1] * image1.shape[-2]  # img1 and 2 should have same shape
+    cantPix = np.sum(mask > 0)
     error = suma / cantPix
     return error
 

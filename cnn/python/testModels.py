@@ -18,6 +18,7 @@ from utils import crcValuePerSubject
 from utils import covValuePerSubject
 from utils import meanPerSlice
 from utils import meanPerSubject
+from utils import stdPerSubject
 from utils import RunModel
 from utils import saveDataCsv
 import SimpleITK as sitk
@@ -131,7 +132,7 @@ for element in arrayGroundTruth:
 
     # read GroundTruth
     groundTruthImg = sitk.ReadImage(pathGroundTruthElement)
-    voxelSize = groundTruthImg.GetSpacing()
+    voxelSize_mm = groundTruthImg.GetSpacing()
     groundTruth = sitk.GetArrayFromImage(groundTruthImg)
     groundTruth = reshapeDataSet(groundTruth)
 
@@ -193,7 +194,6 @@ if normalizeInput:
 contModel = 0
 modelName = []
 
-## App filtros
 
 # Input images
 meanGreyMatterInputImagePerSlice = np.zeros((noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
@@ -204,6 +204,8 @@ meanGreyMatterInputImageGlobal = np.zeros((1))
 meanWhiteMatterInputImageGlobal = np.zeros((1))
 covInputImagePerSlice = np.zeros((noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
 covInputImagePerSubject = np.zeros((noisyImagesArray.shape[0]))
+stdGreyMatterInputImagePerSubject = np.zeros((noisyImagesArray.shape[0]))
+stdWhiteMatterInputImagePerSubject = np.zeros((noisyImagesArray.shape[0]))
 mseInputImagePerSlice = np.zeros((noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
 mseInputImagePerSubject = np.zeros((noisyImagesArray.shape[0]))
 mseGreyMatterInputImagePerSlice = np.zeros((noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
@@ -217,27 +219,35 @@ covInputImageGlobal = np.zeros((1))
 crcInputImageGlobal = np.zeros((1))
 mseInputImageGlobal = np.zeros((1))
 mseGreyMatterInputImageGlobal = np.zeros((1))
+stdGreyMatterInputImageGlobal = np.zeros((1))
+stdWhiteMatterInputImageGlobal = np.zeros((1))
 
 # Input images + filter
-filters = [2,3,4]
-meanGreyMatterFilterPerSlice = np.zeros((len(filters),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-meanWhiteMatterFilterPerSlice = np.zeros((len(filters),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-meanGreyMatterFilterPerSubject = np.zeros((len(filters),noisyImagesArray.shape[0]))
-meanWhiteMatterFilterPerSubject = np.zeros((len(filters),noisyImagesArray.shape[0]))
-covFilterPerSlice = np.zeros((len(filters),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-crcFilterPerSlice = np.zeros((len(filters),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-mseFilterPerSlice = np.zeros((len(filters),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-mseGreyMatterFilterPerSlice = np.zeros((len(filters),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
-covFilterPerSubject = np.zeros((len(filters),noisyImagesArray.shape[0]))
-crcFilterPerSubject = np.zeros((len(filters),noisyImagesArray.shape[0]))
-mseFilterPerSubject = np.zeros((len(filters),noisyImagesArray.shape[0]))
-mseGreyMatterFilterPerSubject = np.zeros((len(filters),noisyImagesArray.shape[0]))
-crcFilterGlobal = np.zeros((len(filters)))
-covFilterGlobal = np.zeros((len(filters)))
-mseFilterGlobal = np.zeros((len(filters)))
-mseGreyMatterFilterGlobal = np.zeros((len(filters)))
-meanGreyMatterFilterGlobal = np.zeros((len(filters)))
-meanWhiteMatterFilterGlobal = np.zeros((len(filters)))
+filtersFWHM_mm = np.array([2,4,6,8])
+filtersFWHM_voxels = filtersFWHM_mm/voxelSize_mm[0] # we use an isometric filter in voxels (using x dimension as voxel size, not ideal)
+filtersStdDev_voxels = filtersFWHM_voxels/2.35
+meanGreyMatterFilterPerSlice = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+meanWhiteMatterFilterPerSlice = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+meanGreyMatterFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+meanWhiteMatterFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+covFilterPerSlice = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+crcFilterPerSlice = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+mseFilterPerSlice = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+mseGreyMatterFilterPerSlice = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
+covFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+crcFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+mseFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+stdGreyMatterFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+stdWhiteMatterFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+mseGreyMatterFilterPerSubject = np.zeros((len(filtersFWHM_mm),noisyImagesArray.shape[0]))
+crcFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+covFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+mseFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+mseGreyMatterFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+meanGreyMatterFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+meanWhiteMatterFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+stdGreyMatterFilterGlobal = np.zeros((len(filtersFWHM_mm)))
+stdWhiteMatterFilterGlobal = np.zeros((len(filtersFWHM_mm)))
 
 
 filterSub = []
@@ -255,43 +265,47 @@ for sub in range(0, len(noisyImagesArrayOrig)):
     # METRICAS INPUT IMAGE
     mask = (noisyImagesSubject * greyMaskSubject)
     meanGreyMatterInputImagePerSlice[sub, :] = meanPerSlice(mask.reshape(mask.shape[0], -1))
-    mseGreyMatterInputImagePerSlice[sub, :] = mseValuePerSlice(mask,(groundTruthSubject*greyMaskSubject))
-    mseGreyMatterInputImagePerSubject[sub] = mseValuePerSubject(mask, (groundTruthSubject*greyMaskSubject))
+    mseGreyMatterInputImagePerSlice[sub, :] = mseValuePerSlice(noisyImagesSubject, groundTruthSubject, greyMaskSubject)
+    mseGreyMatterInputImagePerSubject[sub] = mseValuePerSubject(noisyImagesSubject, groundTruthSubject, greyMaskSubject)
     mask = (noisyImagesSubject * whiteMaskSubject)
     meanWhiteMatterInputImagePerSlice[sub, :] = meanPerSlice(mask.reshape(mask.shape[0], -1))
     crcInputImagePerSlice[sub, :] = crcValuePerSlice(noisyImagesSubject, greyMaskSubject, whiteMaskSubject)
     covInputImagePerSlice[sub, :] = covValuePerSlice(noisyImagesSubject, greyMaskSubject)
-    mseInputImagePerSlice[sub, :] = mseValuePerSlice(noisyImagesSubject,groundTruthSubject)
+    mseInputImagePerSlice[sub, :] = mseValuePerSlice(noisyImagesSubject,groundTruthSubject, greyMaskSubject)
     crcInputImagePerSubject[sub] = crcValuePerSubject(noisyImagesSubject, greyMaskSubject, whiteMaskSubject)
     covInputImagePerSubject[sub] = covValuePerSubject(noisyImagesSubject, greyMaskSubject)
-    mseInputImagePerSubject[sub] = mseValuePerSubject(noisyImagesSubject, groundTruthSubject)
+    mseInputImagePerSubject[sub] = mseValuePerSubject(noisyImagesSubject, groundTruthSubject, greyMaskSubject)
 
     crcInputImageGlobal = np.mean(crcInputImagePerSubject[:])
     covInputImageGlobal = np.mean(covInputImagePerSubject[:])
 
     meanWhiteMatterInputImagePerSubject[sub] = meanPerSubject(meanWhiteMatterInputImagePerSlice[sub, :])
     meanGreyMatterInputImagePerSubject[sub] = meanPerSubject(meanGreyMatterInputImagePerSlice[sub, :])
-
+    stdGreyMatterInputImagePerSubject[sub] = stdPerSubject(noisyImagesSubject * greyMaskSubject)
+    stdWhiteMatterInputImagePerSubject[sub] = stdPerSubject(noisyImagesSubject * whiteMaskSubject)
     meanGreyMatterInputImageGlobal = np.mean(meanGreyMatterInputImagePerSubject[:])
     meanWhiteMatterInputImageGlobal = np.mean(meanWhiteMatterInputImagePerSubject[:])
-    mseInputImageGlobal = np.mean(mseInputImagePerSubject[:])
+    mseInputImageGlobal = np.mean(mseInputImagePerSubject[:]) # remove
     mseGreyMatterInputImageGlobal = np.mean(mseGreyMatterInputImagePerSubject[:])
+    stdGreyMatterInputImageGlobal = np.mean(stdGreyMatterInputImagePerSubject[:])
+    stdWhiteMatterInputImageGlobal = np.mean(stdWhiteMatterInputImagePerSubject[:])
 
     # METRICAS FILTROS + INPUT IMAGE
-    for fil in range(0, len(filters)):
-        numFilter = filters[fil]
-        filter = (skimage.filters.gaussian(noisyImagesSubject, sigma=(numFilter / 2.35))).squeeze()
+    for fil in range(0, len(filtersStdDev_voxels)):
+        filtStdDev_voxels = filtersStdDev_voxels[fil]
+        # Now doing a 2D filter to match the 2D processing of the UNET:
+        filter = (skimage.filters.gaussian(noisyImagesSubject, sigma=(0,filtStdDev_voxels,filtStdDev_voxels))).squeeze()
 
         if saveFilterOutputAsNiftiImage:
             image = sitk.GetImageFromArray(np.array(filter))
-            image.SetSpacing(voxelSize)
+            image.SetSpacing(voxelSize_mm)
             nameImage = 'Subject' + str(nameGroundTruth[sub]) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
         if saveFilterOutputAsNiftiImageOneSubject and (analisisSub == int(nameGroundTruth[sub])):
             image = sitk.GetImageFromArray(np.array(filter))
-            image.SetSpacing(voxelSize)
+            image.SetSpacing(voxelSize_mm)
             nameImage = 'Subject' + str(nameGroundTruth[sub]) +'_dose_'+str(lowDose_perc)+'_filter_'+str(fil)+'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
@@ -303,8 +317,8 @@ for sub in range(0, len(noisyImagesArrayOrig)):
 
         mask = (filter * greyMaskSubject)
         meanGreyMatterFilterPerSlice[fil,sub,:] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
-        mseGreyMatterFilterPerSlice[fil,sub,:] = mseValuePerSlice(mask,(groundTruthSubject*greyMaskSubject))
-        mseGreyMatterFilterPerSubject[fil, sub] = mseValuePerSubject(mask, (groundTruthSubject * greyMaskSubject))
+        mseGreyMatterFilterPerSlice[fil,sub,:] = mseValuePerSlice(filter, groundTruthSubject, greyMaskSubject)
+        mseGreyMatterFilterPerSubject[fil, sub] = mseValuePerSubject(filter, groundTruthSubject, greyMaskSubject)
         mask= (filter * whiteMaskSubject)
         meanWhiteMatterFilterPerSlice[fil,sub, :] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
 
@@ -316,6 +330,8 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         mseFilterPerSubject[fil, sub] = mseValuePerSubject(filter, groundTruthSubject)
         meanGreyMatterFilterPerSubject[fil, sub] = meanPerSubject(meanGreyMatterFilterPerSlice[fil, sub, :])
         meanWhiteMatterFilterPerSubject[fil, sub] = meanPerSubject(meanWhiteMatterFilterPerSlice[fil, sub, :])
+        stdGreyMatterFilterPerSubject[fil, sub] = stdPerSubject(filter * greyMaskSubject)
+        stdWhiteMatterFilterPerSubject[fil, sub] = stdPerSubject(filter * whiteMaskSubject)
 
         crcFilterGlobal[fil] = np.mean(crcFilterPerSubject[fil,:])
         covFilterGlobal[fil] = np.mean(covFilterPerSubject[fil,:])
@@ -325,6 +341,9 @@ for sub in range(0, len(noisyImagesArrayOrig)):
 
         mseFilterGlobal[fil] = np.mean(mseFilterPerSubject[fil,:])
         mseGreyMatterFilterGlobal[fil] =  np.mean(mseGreyMatterFilterPerSubject[fil,:])
+
+        stdGreyMatterFilterGlobal[fil] = np.mean(stdGreyMatterFilterPerSubject[fil, :])
+        stdWhiteMatterFilterGlobal[fil] = np.mean(stdWhiteMatterFilterPerSubject[fil, :])
 
 # Input images + models
 allModelsCrc = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
@@ -339,6 +358,8 @@ allModelsMsePerSlice = np.zeros((len(modelFilenames), noisyImagesArray.shape[0],
 allModelsMsePerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
 allModelsGreyMatterMsePerSlice = np.zeros((len(modelFilenames), noisyImagesArray.shape[0], noisyImagesArray.shape[1]))
 allModelsGreyMatterMsePerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsStdGreyMatterPerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
+allModelsStdWhiteMatterPerSubject = np.zeros((len(modelFilenames), noisyImagesArray.shape[0]))
 
 # Resultados globales
 allModelsCOVGlobal = np.zeros((len(modelFilenames), 1))
@@ -347,6 +368,8 @@ allModelsMeanGMGlobal = np.zeros((len(modelFilenames), 1))
 allModelsMeanWMGlobal = np.zeros((len(modelFilenames), 1))
 allModelsMseGlobal = np.zeros((len(modelFilenames), 1))
 allModelsGreyMatterMseGlobal = np.zeros((len(modelFilenames), 1))
+allModelsStdGreyMatterGlobal = np.zeros((len(modelFilenames), 1))
+allModelsStdWhiteMatterGlobal = np.zeros((len(modelFilenames), 1))
 
 outModel = np.zeros((noisyImagesArray.shape[1], 1,noisyImagesArray.shape[3], noisyImagesArray.shape[3]))
 for modelFilename in modelFilenames:
@@ -384,14 +407,14 @@ for modelFilename in modelFilenames:
 
         if saveModelOutputAsNiftiImage:
             image = sitk.GetImageFromArray(np.array(ndaOutputModel))
-            image.SetSpacing(voxelSize)
+            image.SetSpacing(voxelSize_mm)
             nameImage = 'Subject' + str(nameGroundTruth[sub]) + '_dose_' + str(lowDose_perc) + '_OutModel_' + modelName[-1]  + '.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
 
         if saveModelOutputAsNiftiImageOneSubject and (analisisSub == int(nameGroundTruth[sub])):
             image = sitk.GetImageFromArray(np.array(ndaOutputModel))
-            image.SetSpacing(voxelSize)
+            image.SetSpacing(voxelSize_mm)
             nameImage = 'Subject' + str(nameGroundTruth[sub]) +'_dose_'+str(lowDose_perc)+'_OutModel_'+modelName[-1] +'.nii'
             save_path = os.path.join(pathSaveResults, nameImage)
             sitk.WriteImage(image, save_path)
@@ -407,17 +430,18 @@ for modelFilename in modelFilenames:
         allModelsMeanWM[contModel, sub, :] = meanPerSlice((whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1)))
         allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
         allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
-        allModelsMsePerSlice[contModel,sub,:] = mseValuePerSlice(ndaOutputModel,groundTruthSubject)
-        allModelsMsePerSlice[contModel, sub, :] = mseValuePerSlice(ndaOutputModel, groundTruthSubject)
-        allModelsGreyMatterMsePerSlice[contModel, sub, :] = mseValuePerSlice(greyMaskedImage, (groundTruthSubject*greyMaskSubject))
+        allModelsMsePerSlice[contModel,sub,:] = mseValuePerSlice(ndaOutputModel, groundTruthSubject)
+        allModelsGreyMatterMsePerSlice[contModel, sub, :] = mseValuePerSlice(ndaOutputModel, groundTruthSubject, greyMaskSubject)
 
         # Compute metrics for all subject :
         allModelsCRCperSubject[contModel,sub] = crcValuePerSubject(ndaOutputModel,greyMaskSubject,whiteMaskSubject)
         allModelsCOVperSubject[contModel,sub] = covValuePerSubject(ndaOutputModel, greyMaskSubject)
         allModelsMeanGMperSubject[contModel, sub] = meanPerSubject(allModelsMeanGM[contModel, sub, :])
         allModelsMeanWMperSubject[contModel, sub] = meanPerSubject(allModelsMeanWM[contModel, sub, :])
+        allModelsStdGreyMatterPerSubject[contModel, sub] = stdPerSubject(ndaOutputModel * greyMaskSubject)
+        allModelsStdWhiteMatterPerSubject[contModel, sub] = stdPerSubject(ndaOutputModel * whiteMaskSubject)
         allModelsMsePerSubject[contModel, sub] = mseValuePerSubject(ndaOutputModel, groundTruthSubject)
-        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(greyMaskedImage,(groundTruthSubject * greyMaskSubject))
+        allModelsGreyMatterMsePerSubject[contModel, sub] = mseValuePerSubject(ndaOutputModel, groundTruthSubject, greyMaskSubject)
 
     # Resultados globales
 
@@ -427,26 +451,28 @@ for modelFilename in modelFilenames:
     allModelsMeanWMGlobal[contModel] = np.mean(allModelsMeanWMperSubject[contModel,:])
     allModelsMseGlobal[contModel] = np.mean(allModelsMsePerSubject[contModel, :])
     allModelsGreyMatterMseGlobal[contModel] = np.mean(allModelsGreyMatterMsePerSubject[contModel, :])
+    allModelsStdGreyMatterGlobal[contModel]= np.mean(allModelsStdGreyMatterPerSubject[contModel, :])
+    allModelsStdWhiteMatterGlobal[contModel] = np.mean(allModelsStdGreyMatterPerSubject[contModel, :])
 
     contModel = contModel + 1
 
 # Show plot
 if showGlobalPlots == True:
     namesPlot = ['COV antes', 'COV modelos', 'COV filtros']
-    showPlotGlobalData(covInputImageGlobal,allModelsCOVGlobal,covFilterGlobal,filters * (int(voxelSize[0])),
+    showPlotGlobalData(covInputImageGlobal,allModelsCOVGlobal,covFilterGlobal, filtersFWHM_mm,
                  namesModel=modelName,graphName = 'Cov all models',names=namesPlot, saveFig=True,
                        pathSave=pathSaveResults)
     namesPlot = ['CRC antes', 'CRC modelos', 'CRC filtros']
-    showPlotGlobalData(crcInputImageGlobal, allModelsCRCGlobal, crcFilterGlobal, filters * (int(voxelSize[0])),
+    showPlotGlobalData(crcInputImageGlobal, allModelsCRCGlobal, crcFilterGlobal, filtersFWHM_mm,
                        namesModel=modelName, graphName='Crc all models', names=namesPlot, saveFig=True,
                        pathSave=pathSaveResults)
     namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
     showPlotGlobalData(mseGreyMatterInputImageGlobal, allModelsGreyMatterMseGlobal, mseGreyMatterFilterGlobal,
-                 filters * (int(voxelSize[0])), namesModel=modelName, graphName='MSE Grey Matter all models',
+                 filtersFWHM_mm, namesModel=modelName, graphName='MSE Grey Matter all models',
                  names=namesPlot,saveFig = True, pathSave=pathSaveResults)
     namesPlot = ['MSE antes', 'MSE modelos', 'MSE filtros']
     showPlotGlobalData(mseInputImageGlobal, allModelsMseGlobal, mseFilterGlobal,
-                       filters * (int(voxelSize[0])), namesModel=modelName, graphName='MSE all models',
+                       filtersFWHM_mm, namesModel=modelName, graphName='MSE all models',
                        names=namesPlot, saveFig=True, pathSave=pathSaveResults)
 
 if showPerfilSlices == True:
@@ -457,7 +483,7 @@ if showPerfilSlices == True:
     showDataPlot(meanGreyMatterInputImagePerSlice[analisisSub, :] / meanInputImage[analisisSub],
                  allModelsMeanGM[:, analisisSub, :] / meanOutModel[:, analisisSub, None],
                  meanGreyMatterFilterPerSlice[:, analisisSub, :] / meanFilter[:, analisisSub, None]
-                 , filters * (int(voxelSize[0])), graphName='Mean Grey Matter',
+                 , filtersFWHM_mm, graphName='Mean Grey Matter',
                  names=namesPlot,namesModel = modelName, saveFig = True, pathSave=pathSaveResults)
 
 if showImageSub == True:
@@ -502,6 +528,14 @@ if saveDataCSV == True:
     saveDataCsv(covFilterGlobal, 'covFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
     saveDataCsv(covInputImageGlobal, 'covInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
     saveDataCsv(allModelsCOVGlobal, 'covAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+
+    saveDataCsv(stdGreyMatterFilterGlobal, 'stdGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(stdGreyMatterInputImageGlobal, 'stdGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(allModelsStdGreyMatterGlobal, 'stdGreyMatterAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+
+    saveDataCsv(stdWhiteMatterFilterGlobal, 'stdWhiteMatterFilterGlobal' + nameModel + conjuntoAnalisis + '.csv', pathSaveResults)
+    saveDataCsv(stdWhiteMatterInputImageGlobal, 'stdWhiteMatterInputImageGlobal' + nameModel + conjuntoAnalisis + '.csv', pathSaveResults)
+    saveDataCsv(allModelsStdWhiteMatterGlobal, 'stdWhiteMatterAllModelsGlobal' + nameModel + conjuntoAnalisis + '.csv', pathSaveResults)
 
     saveDataCsv(crcFilterGlobal, 'crcFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
     saveDataCsv(crcInputImageGlobal, 'crcInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
