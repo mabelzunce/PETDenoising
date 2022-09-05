@@ -4,7 +4,7 @@ import skimage
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
-#from unetM import Unet
+from unetM import Unet
 #from unet import Unet
 from unet import UnetWithResidual
 from utils import reshapeDataSet
@@ -68,7 +68,7 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'ResidualUnet4LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameModel = nameModel + '_norm'
 
@@ -84,8 +84,8 @@ lowDoseSubdir = str(lowDose_perc)
 pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
-#model = Unet()
-model = UnetWithResidual(1,1)
+model = Unet()
+#model = UnetWithResidual(1,1)
 #model = Unet(1,1)
 
 

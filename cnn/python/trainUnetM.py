@@ -37,7 +37,7 @@ printStep_batches = 5
 plotStep_batches = 500
 
 normalizeInput = True
-nameThisNet = 'ResidualUnet4LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameThisNet = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameThisNet = nameThisNet + '_norm'
 
@@ -64,9 +64,9 @@ trainNoisyDataSet = []
 validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
-#unet = Unet()
+unet = Unet()
 #unet = Unet(1, 1)
-unet = UnetWithResidual(1, 1)
+#unet = UnetWithResidual(1, 1)
 
 rng = np.random.default_rng()
 #ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)
