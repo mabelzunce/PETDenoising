@@ -7,6 +7,7 @@ from mpl_toolkits.axes_grid1 import ImageGrid
 from unetM import Unet
 #from unet import Unet
 from unet import UnetWithResidual
+from unet import UnetWithResidual5Layers
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
@@ -68,7 +69,7 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'Unet4Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameModel = 'ResidualUnet5LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameModel = nameModel + '_norm'
 
@@ -84,10 +85,10 @@ lowDoseSubdir = str(lowDose_perc)
 pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
-model = Unet()
+#model = Unet()
 #model = UnetWithResidual(1,1)
 #model = Unet(1,1)
-
+model = UnetWithResidual5Layers(1, 1)
 
 ########## LIST OF MODELS ###############
 modelFilenames = os.listdir(modelsPath)
@@ -326,6 +327,7 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         covFilterPerSlice[fil, sub, :] = covValuePerSlice(filter, greyMaskSubject)
 
         crcFilterPerSubject[fil, sub] = crcValuePerSubject(filter, greyMaskSubject, whiteMaskSubject)
+
         covFilterPerSubject[fil, sub] = covValuePerSubject(filter, greyMaskSubject)
         mseFilterPerSubject[fil, sub] = mseValuePerSubject(filter, groundTruthSubject)
         meanGreyMatterFilterPerSubject[fil, sub] = meanPerSubject(meanGreyMatterFilterPerSlice[fil, sub, :])

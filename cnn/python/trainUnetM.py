@@ -7,6 +7,7 @@ import numpy as np
 from scipy.ndimage import rotate
 from sklearn.utils import shuffle
 import os
+import math
 
 import torch
 import torchvision
@@ -22,6 +23,7 @@ from utils import trainModel
 from utils import reshapeDataSet
 from unetM import Unet
 from unet import UnetWithResidual
+from unet import UnetWithResidual5Layers
 
 ######################### CHECK DEVICE ######################
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -32,12 +34,12 @@ batchSize = 8
 epochs = 100
 learning_rate=0.00005
 printStep_epochs = 1
-plotStep_epochs = 1
-printStep_batches = 5
-plotStep_batches = 500
+plotStep_epochs = 5
+printStep_batches = 100
+plotStep_batches = math.inf
 
 normalizeInput = True
-nameThisNet = 'Unet4Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameThisNet = 'ResidualUnet5LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameThisNet = nameThisNet + '_norm'
 
@@ -64,9 +66,10 @@ trainNoisyDataSet = []
 validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
-unet = Unet()
+#unet = Unet()
 #unet = Unet(1, 1)
 #unet = UnetWithResidual(1, 1)
+unet = UnetWithResidual5Layers(1, 1)
 
 rng = np.random.default_rng()
 #ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)

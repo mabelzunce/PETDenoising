@@ -146,3 +146,39 @@ class UnetWithResidual(nn.Module):
         res = self.outc(y1)
         y = self.add_res(x, res)
         return y
+
+class UnetWithResidual5Layers(nn.Module):
+    def __init__(self, in_channels, out_channels):
+        super(UnetWithResidual5Layers, self).__init__()
+        self.n_channels = in_channels
+        self.n_classes =  out_channels
+
+        self.inc = InConv(in_channels, 16)
+        self.down1 = Down(16, 32)
+        self.down2 = Down(32, 64)
+        self.down3 = Down(64, 128)
+        self.down4 = Down(128, 256)
+        self.down5 = Down(256, 512)
+        self.up1 = Up(512 + 256, 256)
+        self.up2 = Up(256 + 128, 128)
+        self.up3 = Up(128 + 64, 64)
+        self.up4 = Up(64 + 32, 32)
+        self.up5 = Up(32 + 16, 16)
+        self.outc = OutConv(16, 1)
+        self.add_res = AddResidual()
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        x6 = self.down5(x5)
+        y5 = self.up1(x6, x5)
+        y4 = self.up2(y5, x4)
+        y3 = self.up3(y4, x3)
+        y2 = self.up4(y3, x2)
+        y1 = self.up5(y2, x1)
+        res = self.outc(y1)
+        y = self.add_res(x, res)
+        return y
