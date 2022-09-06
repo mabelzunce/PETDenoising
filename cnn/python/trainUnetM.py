@@ -37,7 +37,7 @@ printStep_batches = 5
 plotStep_batches = 500
 
 normalizeInput = True
-nameThisNet = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameThisNet = 'Unet4Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameThisNet = nameThisNet + '_norm'
 

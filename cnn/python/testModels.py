@@ -68,7 +68,7 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'Unet5Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameModel = 'Unet4Layers_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameModel = nameModel + '_norm'
 
