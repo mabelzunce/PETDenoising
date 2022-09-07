@@ -92,6 +92,9 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     # lossValuesDevSet: loss por batch para validSet
     # lossValuesDevSetAllEpoch: loss por epoca para validSet
 
+    models_output_path = outputPath + '/models/'
+    if not os.path.exists(models_output_path):
+        os.makedirs(models_output_path)
     # Visualization:
     numImagesPerRow = 4
     if plotStep_batches != math.inf:
@@ -231,14 +234,14 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
 
         if avg_vloss < best_vloss:
             best_vloss = avg_vloss
-            model_path = outputPath + '\\models\\' +  name + '_{}_{}_best_fit'.format(timestamp, epoch)
+            model_path = models_output_path +  name + '_{}_{}_best_fit'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
         if (i % printStep_epochs) == (printStep_epochs - 1):
             print('[Epoch {0}. Time: {1}.]. Training loss: {2}. Validation loss: {3}'.format(epoch, datetime.now(),lossValueTrainingSetAllEpoch[-1], lossValuesDevSetAllEpoch[-1]))
 
         if (save == True) and (epoch%saveInterval_epochs == 0):
-            model_path = outputPath + '\\models\\' + '_{}_{}'.format(timestamp, epoch)
+            model_path = models_output_path +  name + '_{}_{}'.format(timestamp, epoch)
             torch.save(model.state_dict(), model_path)
 
             nameArch = outputPath + name + '_lossValuesTrainingSetBatch_{0}'.format(epoch) + '.xlsx'
@@ -414,7 +417,7 @@ def covValuePerSlice(img, mask):
     meanValuePerSlice = meanPerSlice(masked)
     stdValuePerSlice = stdPerSlice(masked)
 
-    covPerSlice = stdValuePerSlice/meanValuePerSlice
+    covPerSlice = stdValuePerSlice / meanValuePerSlice
     covPerSlice = np.nan_to_num(covPerSlice)
     return covPerSlice
 
@@ -452,7 +455,7 @@ def meanPerSlice(masked):
 
 def stdPerSlice(masked):
 
-    stdPerSlice = np.nanstd(np.where(np.isclose(masked, 0), np.nan, masked),axis=1)
+    stdPerSlice = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=1)
     stdPerSlice = np.nan_to_num(stdPerSlice)
     #stdPerSlice.reshape(stdPerSlice.shape[0], 1)
 
@@ -469,11 +472,8 @@ def meanPerSubject(masked):
     return meanPerSlice
 
 def stdPerSubject(masked):
-
-    stdPerSlice = np.nanstd(np.where(np.isclose(masked, 0), np.nan, masked),axis=0)
-    stdPerSlice = np.nan_to_num(stdPerSlice)
-
-    return stdPerSlice
+    stdForNonZeros = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked))
+    return stdForNonZeros
 
 
 def crcValuePerSlice(img, maskGrey, maskWhite):
@@ -527,42 +527,25 @@ def covValuePerSubject(img, mask):
     covPerSubject = np.nan_to_num(covPerSubject)
     return covPerSubject
 
-def mseValuePerSlice(image1, image2):
-    # normalizar las imagenes por el valor medio
-    meanImage1 = meanPerSlice(image1).mean(axis=-1)
-    meanImage2 = meanPerSlice(image2).mean(axis=-1)
-
-    normImage1 = image1/meanImage1[:,None,None]
-    normImage2 = image2/ meanImage2[:,None,None]
-
-    normImage1 = np.nan_to_num(normImage1, posinf=0)
-    normImage2 = np.nan_to_num(normImage2, posinf=0)
-
-    cuadradoDeDif = ((normImage1 - normImage2) ** 2)
+def mseValuePerSlice(image1, image2, mask = []):
+    if mask == []:
+        mask = np.ones(image1.shape)
+    # Force binary mask:
+    mask = mask > 0
+    cuadradoDeDif = ((image1*mask - image2*mask) ** 2)
     suma = np.sum(np.sum(cuadradoDeDif,axis=1),axis=1)
-    #cantPix = image2.shape[-1] * image1.shape[-2]# img1 and 2 should have same shape
-    X = np.ma.masked_equal(cuadradoDeDif, 0)
-    cantPix = np.sum(np.sum((~(X.mask)), axis=-1),axis=-1)
+    cantPix = np.sum(mask > 0)
     error = suma / cantPix
-    error = np.nan_to_num(error, posinf=0)
     return error
 
-def mseValuePerSubject(image1, image2):
-
-    meanImage1 = np.mean(meanPerSubject(image1))
-    meanImage2 = np.mean(meanPerSubject(image2))
-
-    normImage1 = image1 / meanImage1
-    normImage2 = image2 / meanImage2
-
-    normImage1 = np.nan_to_num(normImage1, posinf=0)
-    normImage2 = np.nan_to_num(normImage2, posinf=0)
-
-    cuadradoDeDif = ((normImage1 - normImage2) ** 2)
-
+def mseValuePerSubject(image1, image2, mask = []):
+    if mask == []:
+        mask = np.ones(image1.shape)
+    # Force binary mask:
+    mask = mask > 0
+    cuadradoDeDif = ((image1*mask - image2*mask) ** 2)
     suma = np.sum(np.sum(np.sum(cuadradoDeDif,axis=1),axis=1))
-    X = np.ma.masked_equal(cuadradoDeDif, 0)
-    cantPix = np.sum(np.sum((~(X.mask)), axis=-1))
+    cantPix = np.sum(mask > 0)
     error = suma / cantPix
     return error
 
@@ -606,6 +589,12 @@ def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,n
         plt.show()
         plt.figure()
 
+        #x = np.arange(0, len(y))
+        #plt.bar(x[0], y[0], label=namesGraph)
+        #plt.legend(loc="upper left")
+        #plt.xlabel(namesGraph)
+        #plt.show()
+        #plt.figure()
     else:
         if antes.shape == ():
             antes = np.repeat(antes, cantModels, axis=0)

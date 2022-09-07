@@ -78,11 +78,11 @@ class OutConv(nn.Module):
 class AddResidual(nn.Module):
     def __init__(self):
         super(AddResidual, self).__init__()
-        self.relu = nn.ReLU(inplace=True)
+        #self.relu = nn.ReLU(inplace=True)
     def forward(self, x, residual):
         x = x + residual
         # Image has only positive values:
-        x = self.relu(x)
+        #x = self.relu(x) # Removing the relu as it is creating too many 0 zero values as negative values are all penalized in the same way.
         return x
 
 class Unet(nn.Module):

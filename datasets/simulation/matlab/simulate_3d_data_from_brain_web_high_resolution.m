@@ -52,10 +52,12 @@ PETrecon = classGpet(PETrecon);
 % se cargan y se generan los fantomas
 brainWebPath = '../../../data/BrainWebPhantoms/';
 imgDir = dir ([brainWebPath]);
+% First create low resolution phantoms of the same size of the
+% reconstructed image:
 for i = 3:length(imgDir)
     n = i-2;
     [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), ...
-        PETsimu.image_size.matrixSize, PETsimu.image_size.voxelSize_mm);
+        PETrecon.image_size.matrixSize, PETrecon.image_size.voxelSize_mm);
 
     pet_rescaled_all_images{n} = single(pet_rescaled);
     mumap_rescaled_rescaled_all_images{n} = single(mumap_rescaled);
@@ -66,7 +68,7 @@ for i = 3:length(imgDir)
     if n == 1
         niftiwrite(pet_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_%d_pet', n)], 'Compressed', 1);
         info = niftiinfo([phantomOutputPath sprintf('Phantom_%d_pet', n)]);
-        info.PixelDimensions = PETsimu.image_size.voxelSize_mm;
+        info.PixelDimensions = PETrecon.image_size.voxelSize_mm;
     end
     info.Datatype = 'single';
     niftiwriteresorted(pet_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_%d_pet', n)], info, 1);
@@ -79,7 +81,33 @@ for i = 3:length(imgDir)
     niftiwriteresorted(uint8(maskWhiteMatter*255), [phantomOutputPath sprintf('Phantom_%d_white_matter', n)], info, 1);
 end
 
+% Now we create the high resolution phantom for the simulations:
+for i = 3:length(imgDir)
+    n = i-2;
+    [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), ...
+        PETsimu.image_size.matrixSize, PETsimu.image_size.voxelSize_mm);
 
+    pet_rescaled_all_images{n} = single(pet_rescaled);
+    mumap_rescaled_rescaled_all_images{n} = single(mumap_rescaled);
+    t1_rescaled_all_images{n} =  single(t1_rescaled);
+    t2_rescaled_all_images{n} =  single(t2_rescaled);
+    classified_tissue_rescaled_all_images{n} =  uint8(classified_tissue_rescaled);
+    refImage_all_images{n} = refImage;
+    if n == 1
+        niftiwrite(pet_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_hr_%d_pet', n)], 'Compressed', 1);
+        info = niftiinfo([phantomOutputPath sprintf('Phantom_hr_%d_pet', n)]);
+        info.PixelDimensions = PETsimu.image_size.voxelSize_mm;
+    end
+    info.Datatype = 'single';
+    niftiwriteresorted(pet_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_hr_%d_pet', n)], info, 1);
+    niftiwriteresorted(mumap_rescaled_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_%d_mumap', n)], info, 1);
+    niftiwriteresorted(t1_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_hr_%d_t1', n)], info, 1);
+    niftiwriteresorted(t2_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_hr_%d_t2', n)], info, 1);
+    info.Datatype = 'uint8';
+    niftiwriteresorted(classified_tissue_rescaled_all_images{n}, [phantomOutputPath sprintf('Phantom_hr_%d_tissues', n)], info, 1);  
+    niftiwriteresorted(uint8(maskGrayMatter*255), [phantomOutputPath sprintf('Phantom_hr_%d_grey_matter', n)], info, 1);
+    niftiwriteresorted(uint8(maskWhiteMatter*255), [phantomOutputPath sprintf('Phantom_hr_%d_white_matter', n)], info, 1);
+end
 %% SIMULATION AND RECONSTRUCTION
 numIterations = 60;
 % Update nift info structure for the reconstruction image size:
