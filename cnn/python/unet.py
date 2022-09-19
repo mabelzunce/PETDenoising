@@ -89,7 +89,7 @@ class Unet(nn.Module):
     def __init__(self, in_channels, classes):
         super(Unet, self).__init__()
         self.n_channels = in_channels
-        self.n_classes =  classes
+        self.n_classes = classes
 
         self.inc = InConv(in_channels, 16)
         self.down1 = Down(16, 32)
@@ -119,7 +119,7 @@ class UnetWithResidual(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UnetWithResidual, self).__init__()
         self.n_channels = in_channels
-        self.n_classes =  out_channels
+        self.n_classes = out_channels
 
         self.inc = InConv(in_channels, 16)
         self.down1 = Down(16, 32)

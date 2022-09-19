@@ -10,20 +10,14 @@ import os
 import math
 
 import torch
-import torchvision
-import torchvision.transforms as transforms
 import torch.optim as optim
 
 from torch import nn
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
-
-from datetime import datetime
 from utils import trainModel
 from utils import reshapeDataSet
-from unetM import Unet
-from unet import UnetWithResidual
-from unet import UnetWithResidual5Layers
+#from unetM import Unet
+#from unet import UnetWithResidual5Layers
+from unet import Unet
 
 ######################### CHECK DEVICE ######################
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -39,7 +33,7 @@ printStep_batches = 100
 plotStep_batches = math.inf
 
 normalizeInput = True
-nameThisNet = 'ResidualUnet5LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameThisNet = 'Unet5LayersNewArchitecture_MSE_lr{0}_AlignTrue'.format(learning_rate)
 if normalizeInput:
     nameThisNet = nameThisNet + '_norm'
 
@@ -67,9 +61,9 @@ validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
 #unet = Unet()
-#unet = Unet(1, 1)
+unet = Unet(1,1)
 #unet = UnetWithResidual(1, 1)
-unet = UnetWithResidual5Layers(1, 1)
+#unet = UnetWithResidual5Layers(1, 1)
 
 rng = np.random.default_rng()
 #ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)
