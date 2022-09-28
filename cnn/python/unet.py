@@ -115,6 +115,79 @@ class Unet(nn.Module):
         x = self.outc(x)
         return x
 
+class Unet512(nn.Module):
+    def __init__(self, in_channels, classes,out_first_layer):
+        super(Unet512, self).__init__()
+        self.n_channels = in_channels
+        self.n_classes = classes
+        self.n_out_first_layer = out_first_layer
+
+        self.inc = InConv(in_channels, out_first_layer)
+
+        self.down1 = Down(out_first_layer, out_first_layer * 2)
+        self.down2 = Down(out_first_layer * 2, out_first_layer * 4)
+        self.down3 = Down(out_first_layer * 4, out_first_layer * 8)
+        self.down4 = Down(out_first_layer * 8,  out_first_layer * 16)
+
+        self.up1 = Up((out_first_layer * 16) + (out_first_layer * 8), out_first_layer * 8)
+        self.up2 = Up((out_first_layer * 8)+(out_first_layer * 4), out_first_layer * 4)
+        self.up3 = Up((out_first_layer * 4) + (out_first_layer * 2), out_first_layer * 2)
+        self.up4 = Up((out_first_layer * 2) + out_first_layer, out_first_layer )
+
+        self.outc = OutConv(out_first_layer, classes)
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        x = self.up1(x5, x4)
+        x = self.up2(x, x3)
+        x = self.up3(x, x2)
+        x = self.up4(x, x1)
+        x = self.outc(x)
+        return x
+
+class UnetDe1a16Hasta512(nn.Module):
+    def __init__(self, in_channels, classes,out_first_layer):
+        super(UnetDe1a16Hasta512, self).__init__()
+        self.n_channels = in_channels
+        self.n_classes = classes
+        self.n_out_first_layer = out_first_layer
+
+        self.inc = InConv(in_channels, out_first_layer)
+
+        self.down1 = Down(out_first_layer, out_first_layer * 2)
+        self.down2 = Down(out_first_layer * 2, out_first_layer * 4)
+        self.down3 = Down(out_first_layer * 4, out_first_layer * 8)
+        self.down4 = Down(out_first_layer * 8,  out_first_layer * 16)
+        self.down5 = Down(out_first_layer * 16, out_first_layer * 32)
+
+        self.up1 = Up((out_first_layer * 32) + (out_first_layer * 16), out_first_layer * 16)
+        self.up2 = Up((out_first_layer * 16) + (out_first_layer * 8), out_first_layer * 8)
+        self.up3 = Up((out_first_layer * 8) + (out_first_layer * 4), out_first_layer * 4)
+        self.up4 = Up((out_first_layer * 4) + (out_first_layer * 2), out_first_layer * 2)
+        self.up5 = Up((out_first_layer * 2) + out_first_layer, out_first_layer)
+
+        self.outc = OutConv(out_first_layer, classes)
+
+    def forward(self, x):
+        x1 = self.inc(x)
+        x2 = self.down1(x1)
+        x3 = self.down2(x2)
+        x4 = self.down3(x3)
+        x5 = self.down4(x4)
+        x6 = self.down5(x5)
+
+        x = self.up1(x6, x5)
+        x = self.up2(x, x4)
+        x = self.up3(x, x3)
+        x = self.up4(x, x2)
+        x = self.up5(x, x1)
+        x = self.outc(x)
+        return x
+
 class UnetWithResidual(nn.Module):
     def __init__(self, in_channels, out_channels):
         super(UnetWithResidual, self).__init__()
