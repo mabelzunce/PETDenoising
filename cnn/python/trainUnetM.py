@@ -15,9 +15,10 @@ import torch.optim as optim
 from torch import nn
 from utils import trainModel
 from utils import reshapeDataSet
-#from unetM import Unet
-#from unet import UnetWithResidual5Layers
 from unet import Unet
+#from unet import UnetWithResidual5Layers
+#from unet import Unet512
+#from unet import UnetDe1a16Hasta512
 
 ######################### CHECK DEVICE ######################
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -33,16 +34,16 @@ printStep_batches = 100
 plotStep_batches = math.inf
 
 normalizeInput = True
-nameThisNet = 'Unet5LayersNewArchitecture_MSE_lr{0}_AlignTrue'.format(learning_rate)
+nameThisNet = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_rate)
 if normalizeInput:
-    nameThisNet = nameThisNet + '_norm'
+    nameThisNet = nameThisNet + '_normMeanValue'
 
 outputPath = '../../results/' + nameThisNet + '/'
 if not os.path.exists(outputPath):
     os.makedirs(outputPath)
 
 # Importo base de datos ...
-path = os.getcwd() + '/' #
+path = os.getcwd() + '/'
 path = '../../data/BrainWebSimulations/'
 lowDose_perc = 5
 actScaleFactor = 100/lowDose_perc
@@ -60,8 +61,9 @@ trainNoisyDataSet = []
 validNoisyDataSet = []
 nametrainNoisyDataSet = []
 
-#unet = Unet()
 unet = Unet(1,1)
+#unet = Unet512(1,1,32)
+#unet = UnetDe1a16Hasta512(1,1,16)
 #unet = UnetWithResidual(1, 1)
 #unet = UnetWithResidual5Layers(1, 1)
 
@@ -97,22 +99,6 @@ for element in arrayGroundTruth:
         validGroundTruth.append(groundTruthDataSet)
         validNoisyDataSet.append(noisyDataSet)
 
-#for element in arrayNoisyDataSet:
-#    pathNoisyDataSetElement = pathNoisyDataSet+'/'+element
-#    noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
-#    noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
-#    name, extension = os.path.splitext(element)
-#    if extension == '.nii':
-#        name, extension2 = os.path.splitext(name)
-#    ind = name.find('Subject')
-#    name = name[ind + len('Subject'):]
-#    nametrainNoisyDataSet.append(name)
-#    if int(name) not in ramdomIdx:
-#        trainNoisyDataSet.append(noisyDataSet)
-#    else:
-#        validNoisyDataSet.append(noisyDataSet)
-
-
 ## Set de entramiento
 trainNoisyDataSetNorm = []
 trainGroundTruthNorm = []
@@ -120,16 +106,18 @@ for subject in range(0, len(trainNoisyDataSet)):
     subjectElementNoisy = trainNoisyDataSet[subject]
     subjectElementGroundTruth = trainGroundTruth[subject]
     for slice in range(0, subjectElementNoisy.shape[0]):
-        maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
-        maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
-        if (maxSliceNoisy > 0.0000001) and (maxSliceGroundTruth > 0.0) :
+        #maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
+        #maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
+        meanSliceNoisy = subjectElementNoisy[slice, :, :].mean()
+        meanSliceGroundTruth = subjectElementGroundTruth[slice, :, :].mean()
+        if (meanSliceNoisy > 0.0000001) and (meanSliceGroundTruth > 0.0) :
             normNoisy = ((subjectElementNoisy[slice, :, :]) )*actScaleFactor # This factor scales up the activity to the full dose values
             normGroundTruth = ((subjectElementGroundTruth[slice, :, :]))
-            maxSliceNoisy = normNoisy.max()
-            maxSliceGroundTruth = normGroundTruth.max()
+            meanSliceNoisy = normNoisy.mean()
+            meanSliceGroundTruth = normGroundTruth.mean()
             if normalizeInput:
-                normNoisy = normNoisy / maxSliceNoisy
-                normGroundTruth = normGroundTruth / maxSliceNoisy # normalize by the input not by the groundtruth, maxSliceGroundTruth
+                normNoisy = normNoisy / meanSliceNoisy
+                normGroundTruth = normGroundTruth / meanSliceNoisy # normalize by the input not by the groundtruth, maxSliceGroundTruth
             trainNoisyDataSetNorm.append(normNoisy)
             trainNoisyDataSetNorm.append(np.rot90(normNoisy))
             trainNoisyDataSetNorm.append(rotate(normNoisy, angle=45, reshape=False))
@@ -144,23 +132,24 @@ for subject in range(0, len(validNoisyDataSet)):
     subjectElementNoisy = validNoisyDataSet[subject]
     subjectElementGroundTruth = validGroundTruth[subject]
     for slice in range(0, subjectElementNoisy.shape[0]):
-        maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
-        maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
-        if (maxSliceNoisy > 0.0000001) and (maxSliceGroundTruth > 0.0) :
+        #maxSliceNoisy = subjectElementNoisy[slice, :, :].max()
+        #maxSliceGroundTruth = subjectElementGroundTruth[slice, :, :].max()
+        meanSliceNoisy = subjectElementNoisy[slice, :, :].mean()
+        meanSliceGroundTruth = subjectElementGroundTruth[slice, :, :].mean()
+        if (meanSliceNoisy > 0.0000001) and (meanSliceGroundTruth > 0.0):
             normNoisy = ((subjectElementNoisy[slice, :, :]) )*actScaleFactor # This factor scales up the activity to the full dose values
             normGroundTruth = ((subjectElementGroundTruth[slice, :, :]))
-            maxSliceNoisy = normNoisy.max()
-            maxSliceGroundTruth = normGroundTruth.max()
+            meanSliceNoisy = normNoisy.mean()
+            meanSliceGroundTruth = normGroundTruth.mean()
             if normalizeInput:
-                normNoisy = normNoisy / maxSliceNoisy
-                normGroundTruth = normGroundTruth / maxSliceNoisy
+                normNoisy = normNoisy / meanSliceNoisy
+                normGroundTruth = normGroundTruth / meanSliceNoisy
             validNoisyDataSetNorm.append(normNoisy)
             validNoisyDataSetNorm.append(np.rot90(normNoisy))
             validNoisyDataSetNorm.append(rotate(normNoisy, angle=45, reshape=False))
             validGroundTruthNorm.append(normGroundTruth)
             validGroundTruthNorm.append(np.rot90(normGroundTruth))
             validGroundTruthNorm.append(rotate(normGroundTruth, angle=45, reshape=False))
-
 
 trainGroundTruthNorm = np.array(trainGroundTruthNorm)
 validGroundTruthNorm = np.array(validGroundTruthNorm)
