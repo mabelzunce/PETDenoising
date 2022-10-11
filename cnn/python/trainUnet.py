@@ -1,185 +1,280 @@
 import nibabel as nb
+import pandas as pd
 import SimpleITK as sitk
 import matplotlib.pyplot as plt
+import numpy
 import numpy as np
+from scipy.ndimage import rotate
+from sklearn.utils import shuffle
+import os
+import math
+
 import torch
-import torchvision
-import torchvision.transforms as transforms
 import torch.optim as optim
 
 from torch import nn
-from torch.utils.data import DataLoader
-from torch.utils.tensorboard import SummaryWriter
-
-from sklearn.model_selection import train_test_split
-from datetime import datetime
-
+from utils import trainModel
+from utils import reshapeDataSet
 from unet import Unet
-from utils import imshow
-from utils import MSE
-import torch
-import torch.nn as nn
-import torchvision
+from utils import saveDataCsv
 
-############################ PARAMETERS ################################################
-# Size of the image we want to use in the cnn.
-# If the dataset images are larger we will crop them.
-imageSize_voxels = (256,256)
+#from unet import UnetWithResidual5Layers
+#from unet import Unet512
+#from unet import UnetDe1a16Hasta512
 
-# Training/dev sets ratio, not using test set at the moment:
-trainingSetRelSize = 0.7
-devSetRelSize = trainingSetRelSize-0.3
+######################### CHECK DEVICE ######################
+device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+print(device)
 
+######################## TRAINING PARAMETERS ###############
+batchSize = 8
+epochs = 100
+learning_rate=0.00005
+printStep_epochs = 1
+plotStep_epochs = 5
+printStep_batches = 100
+plotStep_batches = math.inf
 
-###################### READ DATA AND PRE PROCESS IT FOR TRAINING DATA SETS #####################################################
-# Read the training set:
-noisyDataSet1_nii = sitk.ReadImage('./noisyDataSet1.nii')
-ndaNoisyDataSet1 = sitk.GetArrayFromImage(noisyDataSet1_nii)
+normalizeInput = True
+nameThisNet = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue_GlobalMeanNorm'.format(learning_rate)
+if normalizeInput:
+    nameThisNet = nameThisNet + '_normMeanValue'
 
-noisyDataSet2_nii = sitk.ReadImage('./noisyDataSet2.nii')
-ndaNoisyDataSet2 = sitk.GetArrayFromImage(noisyDataSet2_nii)
+outputPath = '../../results/' + nameThisNet + '/'
 
-groundTruth_nii = sitk.ReadImage('./groundTruth.nii')
-ndaGroundTruth = sitk.GetArrayFromImage(groundTruth_nii)
+#pathSaveResults = 'C:/Users/Encargado/Desktop/'
 
-# Check sizes:
-if ndaNoisyDataSet1.shape != ndaGroundTruth.shape:
-    print("The shape of noisy dataset {0} is different to the ground truth shape {1}.", img_noisyDataSet1.shape, img_groundTruth.shape)
-    exit(-1)
-# Size of each 2d image:
-dataSetImageSize_voxels = ndaNoisyDataSet1.shape[1:3]
-print("Data set original image size:",dataSetImageSize_voxels)
+if not os.path.exists(outputPath):
+    os.makedirs(outputPath)
 
-# Crop the image to be 256x256:
-# Check sizes:
-if ndaNoisyDataSet1.shape[1:2] != imageSize_voxels: #TODO: add the case were the input image is smaller.
-    i_min = np.round((dataSetImageSize_voxels[0]-imageSize_voxels[0])/2).astype(int)
-    i_max = np.round(dataSetImageSize_voxels[0]-(dataSetImageSize_voxels[0] - imageSize_voxels[0]) / 2).astype(int)
-    j_min = np.round((dataSetImageSize_voxels[1] - imageSize_voxels[1]) / 2).astype(int)
-    j_max = np.round(dataSetImageSize_voxels[1]-(dataSetImageSize_voxels[1] - imageSize_voxels[1]) / 2).astype(int)
-    ndaNoisyDataSet1 =ndaNoisyDataSet1[:,i_min:i_max,j_min:j_max]
-    ndaNoisyDataSet2 =ndaNoisyDataSet2[:,i_min:i_max,j_min:j_max]
-    ndaGroundTruth =ndaGroundTruth[:,i_min:i_max,j_min:j_max]
-    dataSetImageSize_voxels = ndaNoisyDataSet1.shape[1:3]
-print("Data set cropped image size:",dataSetImageSize_voxels)
+# Importo base de datos ...
+path = os.getcwd() + '/'
+path = '../../data/BrainWebSimulations/'
+lowDose_perc = 5
+actScaleFactor = 100/lowDose_perc
 
-# Add the channel dimension for compatibility:
-ndaNoisyDataSet1 = np.expand_dims(ndaNoisyDataSet1, axis=1)
-ndaNoisyDataSet2 = np.expand_dims(ndaNoisyDataSet2, axis=0)
-ndaGroundTruth = np.expand_dims(ndaGroundTruth, axis=1)
-# Cast to float (the model expects a float):
-ndaNoisyDataSet1 = ndaNoisyDataSet1.astype(np.float32)
-ndaNoisyDataSet2 = ndaNoisyDataSet2.astype(np.float32)
-ndaGroundTruth = ndaGroundTruth.astype(np.float32)
+pathGroundTruth = path+'/100'
+#pathGroundTruth = path+'/NewDataset/groundTruth/100'
+arrayGroundTruth = os.listdir(pathGroundTruth)
+trainGroundTruth = []
+validGroundTruth = []
 
-######################## TRAINING, VALIDATION AND TEST DATA SETS ###########################
-# Get the number of images for the training and test data sets:
-sizeFullDataSet = int(ndaNoisyDataSet1.shape[0])
-sizeTrainingSet = int(np.round(sizeFullDataSet*trainingSetRelSize))
-sizeDevSet = sizeFullDataSet-sizeTrainingSet
-# Get random indices for the training set:
+pathNoisyDataSet = path + str(lowDose_perc)
+#pathNoisyDataSet = path+'/NewDataset/noisyDataSet/5'
+arrayNoisyDataSet= os.listdir(pathNoisyDataSet)
+trainNoisyDataSet = []
+validNoisyDataSet = []
+nametrainNoisyDataSet = []
+
+unet = Unet(1,1)
+#unet = Unet512(1,1,32)
+#unet = UnetDe1a16Hasta512(1,1,16)
+#unet = UnetWithResidual(1, 1)
+#unet = UnetWithResidual5Layers(1, 1)
+
 rng = np.random.default_rng()
-indicesTrainingSet = rng.choice(int(sizeFullDataSet), int(sizeTrainingSet), replace=False)
-indicesDevSet = np.delete(range(sizeFullDataSet), indicesTrainingSet)
+#ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)
+#ramdomIdx = np.random.randint(1, len(arrayGroundTruth)+1, 4).tolist()
+# Fixed validation phantoms:
+ramdomIdx = [2, 4, 6, 8]
+print(ramdomIdx)
+
+validName = []
+nameGroundTruth = []
+cantidadSlices = []
+
+for element in arrayGroundTruth:
+    pathGroundTruthElement = pathGroundTruth+'/'+element
+    groundTruthDataSet = sitk.ReadImage(pathGroundTruthElement)
+    voxelSize_mm = groundTruthDataSet.GetSpacing()
+    groundTruthDataSet = sitk.GetArrayFromImage(groundTruthDataSet)
+    cantidadSlices.append(len(groundTruthDataSet))
+    name, extension = os.path.splitext(element)
+    if extension == '.gz':
+        name, extension2 = os.path.splitext(name)
+        extension = extension2 + extension
+    ind = name.find('Subject')
+    name = name[ind + len('Subject'):]
+    nameGroundTruth.append(name)
+
+    nametrainNoisyDataSet = 'noisyDataSet5_Subject'+name+ extension
+    pathNoisyDataSetElement = pathNoisyDataSet + '/' + nametrainNoisyDataSet
+    noisyDataSet = sitk.ReadImage(pathNoisyDataSetElement)
+    noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
+
+    if int(name) not in ramdomIdx:
+        trainGroundTruth.append(groundTruthDataSet)
+        trainNoisyDataSet.append(noisyDataSet)
+    else:
+        validName.append(name)
+        validGroundTruth.append(groundTruthDataSet)
+        validNoisyDataSet.append(noisyDataSet)
+
+## Set de entramiento
+trainNoisyDataSetNorm = []
+trainGroundTruthNorm = []
+for subject in range(0, len(trainNoisyDataSet)):
+    subjectElementNoisy = trainNoisyDataSet[subject]
+
+    X = np.ma.masked_equal(subjectElementNoisy, 0)
+    nonZeros = np.sum((~(X.mask)))
+    pixelNonZeros = np.sum(subjectElementNoisy)
+    meanSubjectNoisy = pixelNonZeros / nonZeros
+
+    subjectElementGroundTruth = trainGroundTruth[subject]
+
+    X = np.ma.masked_equal(subjectElementGroundTruth, 0)
+    nonZeros = np.sum((~(X.mask)))
+    pixelNonZeros = np.sum(subjectElementGroundTruth)
+    meanSubjectGroundTruth = pixelNonZeros / nonZeros
+
+    if normalizeInput:
+        subjectNoisyMeanNorm = subjectElementNoisy/meanSubjectNoisy
+        subjectGroundTruthMeanNorm = subjectElementNoisy / meanSubjectNoisy
+
+    for slice in range(0, subjectElementNoisy.shape[0]):
+        meanSliceNoisy = subjectNoisyMeanNorm[slice, :, :].mean()
+        meanSliceGroundTruth = subjectGroundTruthMeanNorm[slice, :, :].mean()
+
+        if (meanSliceNoisy > 0.0000001) and (meanSliceGroundTruth > 0.0):
+            sliceNoisyNorm = subjectNoisyMeanNorm[slice, :, :]
+            sliceGroundTruthNorm = subjectGroundTruthMeanNorm[slice, :, :]
+
+            trainNoisyDataSetNorm.append(sliceNoisyNorm)
+            trainNoisyDataSetNorm.append(np.rot90(sliceNoisyNorm))
+            trainNoisyDataSetNorm.append(rotate(sliceNoisyNorm, angle=45, reshape=False))
+            trainGroundTruthNorm.append(sliceGroundTruthNorm )
+            trainGroundTruthNorm.append(np.rot90(sliceGroundTruthNorm))
+            trainGroundTruthNorm.append(rotate(sliceGroundTruthNorm, angle=45, reshape=False))
+
+subjectDosGroundTruth = []
+subjectDosNoisy = []
+
+# Set de validacion
+validNoisyDataSetNorm = []
+validGroundTruthNorm = []
+
+# relacion
+meanNoisyValuesAntes = []
+meanNoisyValuesDespues = []
+meanGtValuesAntes = []
+meanGtValuesDespues = []
+
+
+for subject in range(0, len(validNoisyDataSet)):
+    subjectElementNoisy = validNoisyDataSet[subject]
+    X = np.ma.masked_equal(subjectElementNoisy, 0)
+    nonZeros = np.sum((~(X.mask)))
+    pixelNonZeros = np.sum(subjectElementNoisy)
+    meanSubjectNoisy = pixelNonZeros / nonZeros
+
+    subjectElementGroundTruth = validGroundTruth[subject]
+    X = np.ma.masked_equal(subjectElementGroundTruth, 0)
+    nonZeros = np.sum((~(X.mask)))
+    pixelNonZeros = np.sum(subjectElementGroundTruth)
+    meanSubjectGroundTruth = pixelNonZeros / nonZeros
+
+    if normalizeInput:
+        normNoisy = subjectElementNoisy / meanSubjectNoisy
+        normGroundTruth = subjectElementGroundTruth / meanSubjectNoisy
+
+    if int(validName[subject]) == 2:
+        subjectDosGroundTruth.append(normGroundTruth)
+        subjectDosNoisy.append(normNoisy)
+
+    for slice in range(0, subjectElementNoisy.shape[0]):
+        meanSliceNoisyNorm = normNoisy[slice, :, :].mean()
+        meanSliceGroundTruthNorm = normGroundTruth[slice, :, :].mean()
+
+        if (meanSliceNoisyNorm > 0.0000001) and (meanSliceGroundTruthNorm > 0.0):
+            sliceNoisyNorm = normNoisy[slice, :, :]
+            liceGroundTruthNorm = normGroundTruth[slice, :, :]
+
+            validNoisyDataSetNorm.append(sliceNoisyNorm)
+            validNoisyDataSetNorm.append(np.rot90(sliceNoisyNorm))
+            validNoisyDataSetNorm.append(rotate(sliceNoisyNorm, angle=45, reshape=False))
+            validGroundTruthNorm.append(sliceGroundTruthNorm)
+            validGroundTruthNorm.append(np.rot90(sliceGroundTruthNorm))
+            validGroundTruthNorm.append(rotate(sliceGroundTruthNorm, angle=45, reshape=False))
+
+            if int(validName[subject]) == 2:
+                meanNoisyValuesAntes.append(subjectElementNoisy[slice, :, :].mean())
+                meanGtValuesAntes.append(subjectElementGroundTruth[slice, :, :].mean())
+
+                meanNoisyValuesDespues.append(normNoisy[slice, :, :].mean())
+                meanGtValuesDespues.append(normGroundTruth[slice, :, :].mean())
+
+#divisionSlices = np.array(subjectDosNoisy)/np.array(subjectDosGroundTruth)
+#divisionSlices = np.nan_to_num(divisionSlices)
+#divisionSlices = divisionSlices.mean(axis=2).mean(axis=1)
+
+#plt.figure(1)
+#plt.imshow(divisionSlices[50])
+
+#plt.figure(2)
+#plt.imshow(subjectDosGroundTruth[50])
+
+#plt.figure(3)
+#plt.imshow(subjectDosNoisy[50])
+
+
+#saveDataCsv(divisionSlices, 'divisionSlices_MaxValue.csv', pathSaveResults)
+saveDataCsv(np.array(meanNoisyValuesAntes), 'meanNoisySlicesAntesNormGlobal_MeanValue.csv', outputPath)
+saveDataCsv(np.array(meanNoisyValuesDespues), 'meanNoisySlicesDspNormGlobal_MeanValue.csv', outputPath)
+saveDataCsv(np.array(meanGtValuesAntes), 'meanGtSlicesAntesNormGlobal_MeanValue.csv', outputPath)
+saveDataCsv(np.array(meanGtValuesDespues), 'meanGtSlicesDspNormGlobal_MeanValue.csv', outputPath)
+
+
+image = sitk.GetImageFromArray(np.array(subjectDosGroundTruth).squeeze())
+image.SetSpacing(voxelSize_mm)
+nameImage = 'ValidGroundTruthMeanGlobal_Subject2.nii'
+save_path = os.path.join(outputPath, nameImage)
+sitk.WriteImage(image, save_path)
+
+image = sitk.GetImageFromArray(np.array(subjectDosNoisy).squeeze())
+image.SetSpacing(voxelSize_mm)
+nameImage = 'ValidNoisyMeanGlobal_Subject2.nii'
+save_path = os.path.join(outputPath, nameImage)
+sitk.WriteImage(image, save_path)
+
+trainGroundTruthNorm = np.array(trainGroundTruthNorm)
+validGroundTruthNorm = np.array(validGroundTruthNorm)
+trainNoisyDataSetNorm = np.array(trainNoisyDataSetNorm)
+validNoisyDataSetNorm = np.array(validNoisyDataSetNorm)
+
+trainGroundTruthNorm = reshapeDataSet(trainGroundTruthNorm.squeeze())
+validGroundTruthNorm = reshapeDataSet(validGroundTruthNorm.squeeze())
+trainNoisyDataSetNorm = reshapeDataSet(trainNoisyDataSetNorm.squeeze())
+validNoisyDataSetNorm = reshapeDataSet(validNoisyDataSetNorm.squeeze())
+
+# Shuffle the data:
+trainNoisyDataSetNorm, trainGroundTruthNorm = shuffle(trainNoisyDataSetNorm, trainGroundTruthNorm, random_state=0)
+validNoisyDataSetNorm, validGroundTruthNorm = shuffle(validNoisyDataSetNorm, validGroundTruthNorm, random_state=0)
+
+print('Train GT:',trainGroundTruthNorm.shape)
+print('Valid GT:',validGroundTruthNorm.shape)
+
+print('Train Noisy Dataset:',trainNoisyDataSetNorm.shape)
+print('Valid Noisy Dataset:',validNoisyDataSetNorm.shape)
+
+df = pd.DataFrame(ramdomIdx)
+df.to_excel('validSubjectsModel6.xlsx')
+
 
 # Create dictionaries with training sets:
-trainingSet = dict([('input',ndaNoisyDataSet1[indicesTrainingSet,:,:,:]), ('output', ndaGroundTruth[indicesTrainingSet,:,:,:])])
-devSet = dict([('input',ndaNoisyDataSet1[indicesDevSet,:,:,:]), ('output', ndaGroundTruth[indicesDevSet,:,:,:])])
+trainingSet = dict([('input',trainNoisyDataSetNorm), ('output', trainGroundTruthNorm)])
+validSet = dict([('input',validNoisyDataSetNorm), ('output', validGroundTruthNorm)])
 
-print('Data set size. Training set: {0}. Dev set: {1}.'.format(trainingSet['input'].shape[0], devSet['input'].shape[0]))
+print('Data set size. Training set: {0}. Valid set: {1}.'.format(trainingSet['input'].shape[0], validSet['input'].shape[0]))
 
-####################### CREATE A U-NET MODEL #############################################
-# Create a UNET with one input and one output canal.
-unet = Unet(1,1)
-inp = torch.rand(1, 1, 256, 256)
-out = unet(inp)
-
-##
-print('Test Unet Input/Output sizes:\n Input size: {0}.\n Output shape: {1}'.format(inp.shape, out.shape))
-#tensorGroundTruth.shape
-
-##################################### U-NET TRAINING ############################################
+# Entrenamiento #
 # Loss and optimizer
+
 criterion = nn.MSELoss()
-optimizer = optim.Adam(unet.parameters(), lr=0.0001)
-
-# Number of  batches:
-batchSize = 10
-numBatches = np.round(trainingSet['input'].shape[0]/batchSize).astype(int)
-# Show results every printStep batches:
-printStep = 1
-figImages, axs = plt.subplots(3, 1,figsize=(20,20))
-figLoss, axLoss = plt.subplots(1, 1,figsize=(5,5))
-# Show dev set loss every showDevLossStep batches:
-showDevLossStep = 4
-inputsDevSet = torch.from_numpy(devSet['input'])
-gtDevSet = torch.from_numpy(devSet['output'])
-# Train
-lossValuesTrainingSet = []
-iterationNumbers = []
-lossValuesDevSet = []
-iterationNumbersForDevSet = []
-iter = 0
-for epoch in range(5):  # loop over the dataset multiple times
-
-    running_loss = 0.0
-    for i in range(numBatches):
-        # get the inputs
-        inputs = torch.from_numpy(trainingSet['input'][i*batchSize:(i+1)*batchSize,:,:,:])
-        gt = torch.from_numpy(trainingSet['output'][i*batchSize:(i+1)*batchSize,:,:,:])
-
-        # zero the parameter gradients
-        optimizer.zero_grad()
-
-        # forward + backward + optimize
-        outputs = unet(inputs)
-        loss = criterion(outputs, gt)
-        loss.backward()
-        optimizer.step()
-
-        # print statistics
-        running_loss += loss.item()
-        # Save loss values:
-        lossValuesTrainingSet.append(loss.item())
-        iterationNumbers.append(iter)
-        # Evaluate dev set if it's the turn to do it:
-        #if i % showDevLossStep == (showDevLossStep-1):
-        #    outputsDevSet = unet(inputsDevSet)
-        #    lossDevSet = criterion(outputsDevSet, gtDevSet)
-        #    lossValuesDevSet.append(lossDevSet.item())
-        #    iterationNumbersForDevSet.append(iter)
-        # Show data it printStep
-        if i % printStep == (printStep-1):    # print every printStep mini-batches
-            print('[%d, %5d] loss: %.3f' %
-                  (epoch + 1, i + 1, running_loss))
-            running_loss = 0.0
-            # Show input images:
-            plt.figure(figImages)
-            plt.axes(axs[0])
-            imshow(torchvision.utils.make_grid(inputs, normalize=True))
-            axs[0].set_title('Input Batch {0}'.format(i))
-            plt.axes(axs[1])
-            imshow(torchvision.utils.make_grid(outputs, normalize=True))
-            axs[1].set_title('Output Epoch {0}'.format(epoch))
-            plt.axes(axs[2])
-            imshow(torchvision.utils.make_grid(gt, normalize=True))
-            axs[2].set_title('Ground Truth')
-            # Show loss:
-            plt.figure(figLoss)
-            axLoss.plot(iterationNumbers, lossValuesTrainingSet)
-            axLoss.plot(iterationNumbersForDevSet, lossValuesDevSet)
-            plt.draw()
-            plt.pause(0.0001)
-        # Update iteration number:
-        iter = iter + 1
-
-print('Finished Training')
-
-plt.pause(0)
+optimizer = optim.Adam(unet.parameters(), lr=learning_rate)
 
 
-
-
-
-
-
+lossValuesTraining,lossValuesEpoch, lossValuesDevSet, lossValuesDevSetAllEpoch = trainModel(unet,trainingSet, validSet,criterion,optimizer, batchSize,
+                                                                                            epochs, device, pre_trained = False, save = True, outputPath=outputPath,name = nameThisNet,
+                                                                                            printStep_batches = printStep_batches, plotStep_batches = plotStep_batches,
+                                                                                            printStep_epochs = printStep_epochs, plotStep_epochs = plotStep_epochs)
