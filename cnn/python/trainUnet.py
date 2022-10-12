@@ -73,13 +73,12 @@ unet = Unet(1,1)
 #unet = UnetWithResidual5Layers(1, 1)
 
 rng = np.random.default_rng()
-#ramdomIdx = rng.choice(len(arrayGroundTruth)+1, int(4), replace=False)
-#ramdomIdx = np.random.randint(1, len(arrayGroundTruth)+1, 4).tolist()
 # Fixed validation phantoms:
 ramdomIdx = [2, 4, 6, 8]
 print(ramdomIdx)
 
 validName = []
+trainingName = []
 nameGroundTruth = []
 cantidadSlices = []
 
@@ -103,6 +102,7 @@ for element in arrayGroundTruth:
     noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
 
     if int(name) not in ramdomIdx:
+        trainingName.append(name)
         trainGroundTruth.append(groundTruthDataSet)
         trainNoisyDataSet.append(noisyDataSet)
     else:
@@ -113,24 +113,33 @@ for element in arrayGroundTruth:
 ## Set de entramiento
 trainNoisyDataSetNorm = []
 trainGroundTruthNorm = []
+
+subjectDiezGroundTruth = []
+subjectDiezNoisy = []
+
 for subject in range(0, len(trainNoisyDataSet)):
     subjectElementNoisy = trainNoisyDataSet[subject]
-
     X = np.ma.masked_equal(subjectElementNoisy, 0)
     nonZeros = np.sum((~(X.mask)))
     pixelNonZeros = np.sum(subjectElementNoisy)
     meanSubjectNoisy = pixelNonZeros / nonZeros
 
+    #meanSubjectNoisy = subjectElementNoisy.max()
+
     subjectElementGroundTruth = trainGroundTruth[subject]
 
-    X = np.ma.masked_equal(subjectElementGroundTruth, 0)
-    nonZeros = np.sum((~(X.mask)))
-    pixelNonZeros = np.sum(subjectElementGroundTruth)
-    meanSubjectGroundTruth = pixelNonZeros / nonZeros
+    #X = np.ma.masked_equal(subjectElementGroundTruth, 0)
+    #nonZeros = np.sum((~(X.mask)))
+    #pixelNonZeros = np.sum(subjectElementGroundTruth)
+    #meanSubjectGroundTruth = pixelNonZeros / nonZeros
 
     if normalizeInput:
         subjectNoisyMeanNorm = subjectElementNoisy/meanSubjectNoisy
-        subjectGroundTruthMeanNorm = subjectElementNoisy / meanSubjectNoisy
+        subjectGroundTruthMeanNorm = subjectElementGroundTruth / meanSubjectNoisy
+
+    if int(trainingName[subject]) == 10:
+        subjectDiezGroundTruth.append(subjectGroundTruthMeanNorm)
+        subjectDiezNoisy.append(subjectNoisyMeanNorm)
 
     for slice in range(0, subjectElementNoisy.shape[0]):
         meanSliceNoisy = subjectNoisyMeanNorm[slice, :, :].mean()
@@ -143,7 +152,7 @@ for subject in range(0, len(trainNoisyDataSet)):
             trainNoisyDataSetNorm.append(sliceNoisyNorm)
             trainNoisyDataSetNorm.append(np.rot90(sliceNoisyNorm))
             trainNoisyDataSetNorm.append(rotate(sliceNoisyNorm, angle=45, reshape=False))
-            trainGroundTruthNorm.append(sliceGroundTruthNorm )
+            trainGroundTruthNorm.append(sliceGroundTruthNorm)
             trainGroundTruthNorm.append(np.rot90(sliceGroundTruthNorm))
             trainGroundTruthNorm.append(rotate(sliceGroundTruthNorm, angle=45, reshape=False))
 
@@ -166,13 +175,16 @@ for subject in range(0, len(validNoisyDataSet)):
     X = np.ma.masked_equal(subjectElementNoisy, 0)
     nonZeros = np.sum((~(X.mask)))
     pixelNonZeros = np.sum(subjectElementNoisy)
-    meanSubjectNoisy = pixelNonZeros / nonZeros
+    meanSubjectNoisy = pixelNonZeros/nonZeros
+
+    #meanSubjectNoisy = subjectElementNoisy.max()
 
     subjectElementGroundTruth = validGroundTruth[subject]
-    X = np.ma.masked_equal(subjectElementGroundTruth, 0)
-    nonZeros = np.sum((~(X.mask)))
-    pixelNonZeros = np.sum(subjectElementGroundTruth)
-    meanSubjectGroundTruth = pixelNonZeros / nonZeros
+
+    #X = np.ma.masked_equal(subjectElementGroundTruth, 0)
+    #nonZeros = np.sum((~(X.mask)))
+    #pixelNonZeros = np.sum(subjectElementGroundTruth)
+    #meanSubjectGroundTruth = pixelNonZeros / nonZeros
 
     if normalizeInput:
         normNoisy = subjectElementNoisy / meanSubjectNoisy
@@ -188,7 +200,7 @@ for subject in range(0, len(validNoisyDataSet)):
 
         if (meanSliceNoisyNorm > 0.0000001) and (meanSliceGroundTruthNorm > 0.0):
             sliceNoisyNorm = normNoisy[slice, :, :]
-            liceGroundTruthNorm = normGroundTruth[slice, :, :]
+            sliceGroundTruthNorm = normGroundTruth[slice, :, :]
 
             validNoisyDataSetNorm.append(sliceNoisyNorm)
             validNoisyDataSetNorm.append(np.rot90(sliceNoisyNorm))
@@ -234,6 +246,18 @@ sitk.WriteImage(image, save_path)
 image = sitk.GetImageFromArray(np.array(subjectDosNoisy).squeeze())
 image.SetSpacing(voxelSize_mm)
 nameImage = 'ValidNoisyMeanGlobal_Subject2.nii'
+save_path = os.path.join(outputPath, nameImage)
+sitk.WriteImage(image, save_path)
+
+image = sitk.GetImageFromArray(np.array(subjectDiezGroundTruth).squeeze())
+image.SetSpacing(voxelSize_mm)
+nameImage = 'TrainGroundTruthMeanGlobal_Subject10.nii'
+save_path = os.path.join(outputPath, nameImage)
+sitk.WriteImage(image, save_path)
+
+image = sitk.GetImageFromArray(np.array(subjectDiezNoisy).squeeze())
+image.SetSpacing(voxelSize_mm)
+nameImage = 'TrainNoisyMeanGlobal_Subject10.nii'
 save_path = os.path.join(outputPath, nameImage)
 sitk.WriteImage(image, save_path)
 
