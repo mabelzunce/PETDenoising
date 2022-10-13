@@ -1,13 +1,13 @@
 import torch
-import torchvision
 import skimage
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 
-from unetM import Unet
-#from unet import Unet
-from unet import UnetWithResidual
-from unet import UnetWithResidual5Layers
+#from unetM import Unet
+from unet import Unet
+#from unet import UnetDe1a16Hasta512
+#from unet import UnetWithResidual
+#from unet import UnetWithResidual5Layers
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
@@ -30,6 +30,9 @@ from sklearn.model_selection import train_test_split
 
 ######## CONFIG ###########
 normalizeInput = True
+normalizeInputMeanGlobal = True
+normalizeInputMeanSlice = False
+normalizeInputMaxSlice = False
 learning_rate=0.00005
 lowDose_perc = 5
 epoch = 23
@@ -69,9 +72,24 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'ResidualUnet5LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
-if normalizeInput:
+#nameModel = 'ResidualUnet5LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
+#nameModel = 'Unet5LayersNewArchitecture_MSE_lr{0}_AlignTrue'.format(learning_rate)
+
+#nameModel = 'Unet5LayersNewArchitectureHasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+#nameModel = 'Unet6LayersNewArchitectureDe1a16Hasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+
+#nameModel = 'Unet5Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+
+#nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+
+nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+
+
+if normalizeInputMeanSlice:
     nameModel = nameModel + '_norm'
+if normalizeInputMeanGlobal:
+    nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
+
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -87,8 +105,10 @@ pathSaveResults = '../../results/' + nameModel + '/'
 ########### CREATE MODEL ###########
 #model = Unet()
 #model = UnetWithResidual(1,1)
-#model = Unet(1,1)
-model = UnetWithResidual5Layers(1, 1)
+#model = Unet512(1,1,32)
+#model = UnetDe1a16Hasta512(1,1,16)
+model = Unet(1,1)
+#model = UnetWithResidual5Layers(1, 1)
 
 ########## LIST OF MODELS ###############
 modelFilenames = os.listdir(modelsPath)
@@ -128,6 +148,11 @@ if calculateAllSubjectMetrics:
 analisisSlice = 80
 
 # leo los dataSet
+
+meanGlobalSubjectNoisy = []
+subjectsNames = []
+noisyImagesArrayOrig = []
+
 for element in arrayGroundTruth:
     pathGroundTruthElement = pathGroundTruth+'/'+element
 
@@ -156,6 +181,7 @@ for element in arrayGroundTruth:
         noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
         noisyDataSet = reshapeDataSet(noisyDataSet)
 
+
         # read greyMask
         nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
         #nameGreyMask = 'Subject' + name + 'GreyMask.nii'
@@ -172,6 +198,18 @@ for element in arrayGroundTruth:
         whiteMask = sitk.GetArrayFromImage(whiteMask)
         whiteMask = reshapeDataSet(whiteMask)
 
+        if normalizeInputMeanGlobal:
+            subjectsNames.append(name)
+
+            X = np.ma.masked_equal(noisyDataSet, 0)
+            nonZeros = np.sum((~(X.mask)))
+            pixelNonZeros = np.sum(noisyDataSet)
+            meanGlobalSubjectNoisy.append(pixelNonZeros / nonZeros)
+
+            noisyDataSet = noisyDataSet / meanGlobalSubjectNoisy[-1]
+
+            noisyImagesArrayOrig.append(noisyDataSet)
+
         nameGroundTruth.append(name)
         groundTruthArray.append(groundTruth)
         noisyImagesArray.append(noisyDataSet)
@@ -183,15 +221,31 @@ groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
 greyMaskArray = np.array(greyMaskArray)
 
-noisyImagesArrayOrig = noisyImagesArray
+if normalizeInputMeanGlobal:
+    noisyImagesArrayOrig = np.array(noisyImagesArrayOrig)
 
 # Get the maximum value per slice:
-maxSlice = noisyImagesArray[:, :, :, :].max(axis=4).max(axis=3)
-maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
 # Normalize the input if necessary:
-if normalizeInput:
-    noisyImagesArray = noisyImagesArray/maxSlice[:,:,:,None,None]
+if normalizeInputMeanSlice:
+    noisyImagesArrayOrig = noisyImagesArray
+
+    meanSlice = noisyImagesArray[:, :, :, :].mean(axis=4).mean(axis=3)
+    meanSliceGroundTruth = groundTruthArray[:, :, :, :].mean(axis=4).mean(axis=3)
+    noisyImagesArray = noisyImagesArray / meanSlice
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
+
+    noisyImagesArrayOrig = noisyImagesArray
+
+if normalizeInputMaxSlice:
+    noisyImagesArrayOrig = noisyImagesArray
+
+    maxSlice = noisyImagesArray[:, :, :, :].max(axis=4).max(axis=3)
+    maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
+    noisyImagesArray = noisyImagesArray / maxSlice
+    noisyImagesArray = np.nan_to_num(noisyImagesArray)
+
+
+
 contModel = 0
 modelName = []
 
@@ -335,14 +389,14 @@ for sub in range(0, len(noisyImagesArrayOrig)):
         stdGreyMatterFilterPerSubject[fil, sub] = stdPerSubject(filter * greyMaskSubject)
         stdWhiteMatterFilterPerSubject[fil, sub] = stdPerSubject(filter * whiteMaskSubject)
 
-        crcFilterGlobal[fil] = np.mean(crcFilterPerSubject[fil,:])
-        covFilterGlobal[fil] = np.mean(covFilterPerSubject[fil,:])
+        crcFilterGlobal[fil] = np.mean(crcFilterPerSubject[fil, :])
+        covFilterGlobal[fil] = np.mean(covFilterPerSubject[fil, :])
 
         meanGreyMatterFilterGlobal[fil] = np.mean(meanGreyMatterFilterPerSubject[fil, :])
         meanWhiteMatterFilterGlobal[fil] = np.mean(meanWhiteMatterFilterPerSubject[fil, :])
 
-        mseFilterGlobal[fil] = np.mean(mseFilterPerSubject[fil,:])
-        mseGreyMatterFilterGlobal[fil] =  np.mean(mseGreyMatterFilterPerSubject[fil,:])
+        mseFilterGlobal[fil] = np.mean(mseFilterPerSubject[fil, :])
+        mseGreyMatterFilterGlobal[fil] = np.mean(mseGreyMatterFilterPerSubject[fil, :])
 
         stdGreyMatterFilterGlobal[fil] = np.mean(stdGreyMatterFilterPerSubject[fil, :])
         stdWhiteMatterFilterGlobal[fil] = np.mean(stdWhiteMatterFilterPerSubject[fil, :])
@@ -386,7 +440,16 @@ for modelFilename in modelFilenames:
         groundTruthSubject = groundTruthArray[sub, :, :, :, :].squeeze() # Remove the channel dimension
         whiteMaskSubject = whiteMaskArray[sub, :, :, :, :].squeeze()
         greyMaskSubject = greyMaskArray[sub, :, :, :, :].squeeze()
-        maxSliceSubject = maxSlice[sub, :].squeeze()
+
+        if normalizeInputMaxSlice:
+            normSubject = maxSlice[sub, :].squeeze()
+
+        if normalizeInputMeanSlice:
+            normSubject = meanSlice[sub, :].squeeze()
+
+        if normalizeInputMeanGlobal:
+            normSubject = meanGlobalSubjectNoisy[sub]
+
         print('Subject ', idxConjunto[sub])
 
         if batchSubjects:
@@ -404,8 +467,15 @@ for modelFilename in modelFilenames:
 
         ndaOutputModel = ndaOutputModel.squeeze()  # Remove the channel dimension
         # Unnormalize if using normalization:
-        if normalizeInput:
-            ndaOutputModel = ndaOutputModel * maxSliceSubject[:,None,None]
+        if normalizeInputMeanSlice:
+            #ndaOutputModel = ndaOutputModel * maxSliceSubject[:,None,None]
+            ndaOutputModel = ndaOutputModel * normSubject[:, None, None]
+
+        if normalizeInputMaxSlice:
+            ndaOutputModel = ndaOutputModel * normSubject[:,None,None]
+
+        if normalizeInputMeanGlobal:
+            ndaOutputModel = ndaOutputModel * normSubject
 
         if saveModelOutputAsNiftiImage:
             image = sitk.GetImageFromArray(np.array(ndaOutputModel))
@@ -428,10 +498,9 @@ for modelFilename in modelFilenames:
         whiteMaskedImage = (ndaOutputModel * whiteMaskSubject)
 
         # Compute metrics for each subject all slices:
-        allModelsMeanGM[contModel,sub,:] = meanPerSlice((greyMaskedImage.reshape(greyMaskedImage.shape[0], -1)))
-        allModelsMeanWM[contModel, sub, :] = meanPerSlice((whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1)))
-        allModelsCrc[contModel,sub,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
-        allModelsCov[contModel,sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
+        allModelsMeanGM[contModel, sub,  :] = meanPerSlice((whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1)))
+        allModelsCrc[contModel, sub, :] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
+        allModelsCov[contModel, sub,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
         allModelsMsePerSlice[contModel,sub,:] = mseValuePerSlice(ndaOutputModel, groundTruthSubject)
         allModelsGreyMatterMsePerSlice[contModel, sub, :] = mseValuePerSlice(ndaOutputModel, groundTruthSubject, greyMaskSubject)
 
@@ -523,30 +592,30 @@ if showImageSub == True:
     plt.savefig(pathSaveResults + 'ResultsModel')
 
 if saveDataCSV == True:
-    saveDataCsv(meanGreyMatterFilterGlobal, 'meanGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(meanGreyMatterInputImageGlobal, 'meanGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(allModelsMeanGMGlobal, 'meanGreyMatterAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(meanGreyMatterFilterGlobal, 'meanGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(meanGreyMatterInputImageGlobal, 'meanGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(allModelsMeanGMGlobal, 'meanGreyMatterAllModelsGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
 
-    saveDataCsv(covFilterGlobal, 'covFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(covInputImageGlobal, 'covInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(allModelsCOVGlobal, 'covAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(covFilterGlobal, 'covFilterGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(covInputImageGlobal, 'covInputImageGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(allModelsCOVGlobal, 'covAllModelsGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
 
-    saveDataCsv(stdGreyMatterFilterGlobal, 'stdGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(stdGreyMatterInputImageGlobal, 'stdGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(allModelsStdGreyMatterGlobal, 'stdGreyMatterAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(stdGreyMatterFilterGlobal, 'stdGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(stdGreyMatterInputImageGlobal, 'stdGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(allModelsStdGreyMatterGlobal, 'stdGreyMatterAllModelsGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
 
-    saveDataCsv(stdWhiteMatterFilterGlobal, 'stdWhiteMatterFilterGlobal' + nameModel + conjuntoAnalisis + '.csv', pathSaveResults)
-    saveDataCsv(stdWhiteMatterInputImageGlobal, 'stdWhiteMatterInputImageGlobal' + nameModel + conjuntoAnalisis + '.csv', pathSaveResults)
-    saveDataCsv(allModelsStdWhiteMatterGlobal, 'stdWhiteMatterAllModelsGlobal' + nameModel + conjuntoAnalisis + '.csv', pathSaveResults)
+    saveDataCsv(stdWhiteMatterFilterGlobal, 'stdWhiteMatterFilterGlobal' + nameModel + conjuntoAnalisis +'_dose_'+str(lowDose_perc)+ '.csv', pathSaveResults)
+    saveDataCsv(stdWhiteMatterInputImageGlobal, 'stdWhiteMatterInputImageGlobal' + nameModel + conjuntoAnalisis +'_dose_'+str(lowDose_perc)+ '.csv', pathSaveResults)
+    saveDataCsv(allModelsStdWhiteMatterGlobal, 'stdWhiteMatterAllModelsGlobal' + nameModel + conjuntoAnalisis +'_dose_'+str(lowDose_perc)+ '.csv', pathSaveResults)
 
-    saveDataCsv(crcFilterGlobal, 'crcFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(crcInputImageGlobal, 'crcInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(allModelsCRCGlobal, 'crcAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(crcFilterGlobal, 'crcFilterGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(crcInputImageGlobal, 'crcInputImageGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(allModelsCRCGlobal, 'crcAllModelsGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
 
-    saveDataCsv(mseFilterGlobal, 'mseFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(mseInputImageGlobal, 'mseInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(allModelsMseGlobal, 'mseAllModelsGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(mseFilterGlobal, 'mseFilterGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(mseInputImageGlobal, 'mseInputImageGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(allModelsMseGlobal, 'mseAllModelsGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
 
-    saveDataCsv(mseGreyMatterFilterGlobal, 'mseGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(mseGreyMatterInputImageGlobal, 'mseGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
-    saveDataCsv(allModelsGreyMatterMseGlobal, 'allModelsGreyMatterMseGlobal'+nameModel+conjuntoAnalisis+'.csv', pathSaveResults)
+    saveDataCsv(mseGreyMatterFilterGlobal, 'mseGreyMatterFilterGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(mseGreyMatterInputImageGlobal, 'mseGreyMatterInputImageGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
+    saveDataCsv(allModelsGreyMatterMseGlobal, 'allModelsGreyMatterMseGlobal'+nameModel+conjuntoAnalisis+'_dose_'+str(lowDose_perc)+'.csv', pathSaveResults)
