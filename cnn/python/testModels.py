@@ -29,8 +29,9 @@ import os
 from sklearn.model_selection import train_test_split
 
 ######## CONFIG ###########
-normalizeInput = True
-normalizeInputMeanGlobal = True
+normalizeInput = False
+normalizeInputMeanGlobal = False
+normalizeInputMaxGlobal = True
 normalizeInputMeanSlice = False
 normalizeInputMaxSlice = False
 learning_rate=0.00005
@@ -89,7 +90,8 @@ if normalizeInputMeanSlice:
     nameModel = nameModel + '_norm'
 if normalizeInputMeanGlobal:
     nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
-
+if normalizeInputMaxGlobal:
+    nameModel = nameModel+ '_GlobalMaxNorm_normMaxValue'
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -150,6 +152,7 @@ analisisSlice = 80
 # leo los dataSet
 
 meanGlobalSubjectNoisy = []
+maxGlobalSubjectNoisy = []
 subjectsNames = []
 noisyImagesArrayOrig = []
 
@@ -206,9 +209,17 @@ for element in arrayGroundTruth:
             pixelNonZeros = np.sum(noisyDataSet)
             meanGlobalSubjectNoisy.append(pixelNonZeros / nonZeros)
 
-            noisyDataSet = noisyDataSet / meanGlobalSubjectNoisy[-1]
+            noisyImagesArrayOrig.append(noisyDataSet)
+
+            noisyDataSet = noisyDataSet/meanGlobalSubjectNoisy[-1]
+
+        if normalizeInputMaxGlobal:
+            subjectsNames.append(name)
+            maxGlobalSubjectNoisy.append(noisyDataSet.max())
 
             noisyImagesArrayOrig.append(noisyDataSet)
+
+            noisyDataSet = noisyDataSet/maxGlobalSubjectNoisy[-1]
 
         nameGroundTruth.append(name)
         groundTruthArray.append(groundTruth)
@@ -221,7 +232,7 @@ groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
 greyMaskArray = np.array(greyMaskArray)
 
-if normalizeInputMeanGlobal:
+if normalizeInputMeanGlobal or maxGlobalSubjectNoisy:
     noisyImagesArrayOrig = np.array(noisyImagesArrayOrig)
 
 # Get the maximum value per slice:
@@ -234,7 +245,6 @@ if normalizeInputMeanSlice:
     noisyImagesArray = noisyImagesArray / meanSlice
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
 
-    noisyImagesArrayOrig = noisyImagesArray
 
 if normalizeInputMaxSlice:
     noisyImagesArrayOrig = noisyImagesArray
@@ -243,8 +253,6 @@ if normalizeInputMaxSlice:
     maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
     noisyImagesArray = noisyImagesArray / maxSlice
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
-
-
 
 contModel = 0
 modelName = []
@@ -450,6 +458,9 @@ for modelFilename in modelFilenames:
         if normalizeInputMeanGlobal:
             normSubject = meanGlobalSubjectNoisy[sub]
 
+        if normalizeInputMaxGlobal:
+            normSubject = maxGlobalSubjectNoisy[sub]
+
         print('Subject ', idxConjunto[sub])
 
         if batchSubjects:
@@ -475,6 +486,9 @@ for modelFilename in modelFilenames:
             ndaOutputModel = ndaOutputModel * normSubject[:,None,None]
 
         if normalizeInputMeanGlobal:
+            ndaOutputModel = ndaOutputModel * normSubject
+
+        if normalizeInputMaxGlobal:
             ndaOutputModel = ndaOutputModel * normSubject
 
         if saveModelOutputAsNiftiImage:

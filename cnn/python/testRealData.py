@@ -33,7 +33,8 @@ print(device)
 
 ######## CONFIG ###########
 normalizeInput = False
-normalizeInputMeanGlobal = True
+normalizeInputMeanGlobal = False
+normalizeInputMaxGlobal = True
 normalizeInputMaxSlice = False
 learning_rate=0.00005
 
@@ -61,14 +62,16 @@ dataPath = '../../data/RealData/' + dataset + '/'
 #nameModel = 'Unet6LayersNewArchitectureDe1a16Hasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
 #nameModel = 'ResidualUnet5LayersWithoutRelu_MSE_lr5e-05_AlignTrue'.format(learning_rate)
 #nameModel = 'ResidualUnet4LayersWithoutRelu_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-nameModel = 'Unet4Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+#nameModel = 'Unet4Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
 #nameModel = 'Unet5Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
 
 nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_rate)
 
-
 if normalizeInputMeanGlobal:
     nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
+
+if normalizeInputMaxGlobal:
+    nameModel = nameModel+ '_GlobalMaxNorm_normMaxValue'
 
 if normalizeInput:
     nameModel = nameModel + '_norm'
@@ -98,6 +101,7 @@ namesPet = []
 petImages = []
 
 meanGlobalSubjectNoisy = []
+maxGlobalSubjectNoisy = []
 noisyImagesArrayOrig = []
 
 for element in arrayPet:
@@ -121,6 +125,13 @@ for element in arrayPet:
 
         pet = pet / meanGlobalSubjectNoisy[-1]
 
+    if normalizeInputMaxGlobal:
+        noisyImagesArrayOrig.append(pet)
+
+        maxGlobalSubjectNoisy.append(pet.max())
+
+        pet = pet / maxGlobalSubjectNoisy[-1]
+
     petImages.append(pet)
 
 petImages = np.array(petImages)
@@ -133,8 +144,9 @@ if normalizeInputMaxSlice:
     noisyImagesArrayOrig = petImages
     noisyImagesArray = petImages/maxSlice[:,:,:,None,None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
-if normalizeInputMeanGlobal:
+if normalizeInputMeanGlobal or normalizeInputMaxGlobal:
     noisyImagesArray = petImages
+
 noisyImagesArrayOrig  = np.array(noisyImagesArrayOrig)
 # ---------------------------- MASCARAS ----------------------------------------------- #
 
@@ -286,6 +298,9 @@ for modelFilename in modelFilenames:
             normSubject = maxSlice[dose, :].squeeze()
         if normalizeInputMeanGlobal:
             normSubject = meanGlobalSubjectNoisy[dose]
+        if normalizeInputMaxGlobal:
+            normSubject = maxGlobalSubjectNoisy[dose]
+
         print('PET DOSE ', namesPet[dose])
 
         if batchSubjects:
@@ -307,6 +322,9 @@ for modelFilename in modelFilenames:
             ndaOutputModel = ndaOutputModel * normSubject[:,None,None]
 
         if normalizeInputMeanGlobal:
+            ndaOutputModel = ndaOutputModel * normSubject
+
+        if normalizeInputMaxGlobal:
             ndaOutputModel = ndaOutputModel * normSubject
 
         if saveModelOutputAsNiftiImage:
