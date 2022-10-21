@@ -32,6 +32,7 @@ from sklearn.model_selection import train_test_split
 normalizeInput = False
 normalizeInputMeanGlobal = False
 normalizeInputMaxGlobal = True
+normalizeInputMeanStdSlice = False
 normalizeInputMeanSlice = False
 normalizeInputMaxSlice = False
 learning_rate=0.00005
@@ -87,11 +88,15 @@ nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_r
 
 
 if normalizeInputMeanSlice:
+    nameModel = nameModel + '_normMeanValue'
+if normalizeInputMaxSlice:
     nameModel = nameModel + '_norm'
 if normalizeInputMeanGlobal:
     nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
 if normalizeInputMaxGlobal:
     nameModel = nameModel+ '_GlobalMaxNorm_normMaxValue'
+if normalizeInputMeanStdSlice:
+    nameModel = nameModel + '_normMeanStdValue'
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -242,7 +247,16 @@ if normalizeInputMeanSlice:
 
     meanSlice = noisyImagesArray[:, :, :, :].mean(axis=4).mean(axis=3)
     meanSliceGroundTruth = groundTruthArray[:, :, :, :].mean(axis=4).mean(axis=3)
-    noisyImagesArray = noisyImagesArray / meanSlice
+    noisyImagesArray = noisyImagesArray / meanSlice [:,:,:,None,None]
+    noisyImagesArray = np.nan_to_num(noisyImagesArray)
+
+if normalizeInputMeanStdSlice:
+    noisyImagesArrayOrig = noisyImagesArray
+
+    meanSlice = noisyImagesArray[:, :, :, :].mean(axis=4).mean(axis=3)
+    stdSlice = noisyImagesArray[:, :, :, :].std(axis=4).std(axis=3)
+    meanSliceGroundTruth = groundTruthArray[:, :, :, :].mean(axis=4).mean(axis=3)
+    noisyImagesArray = (noisyImagesArray - meanSlice[:,:,:,None,None]) / stdSlice[:,:,:,None,None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
 
 
@@ -251,7 +265,7 @@ if normalizeInputMaxSlice:
 
     maxSlice = noisyImagesArray[:, :, :, :].max(axis=4).max(axis=3)
     maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
-    noisyImagesArray = noisyImagesArray / maxSlice
+    noisyImagesArray = noisyImagesArray / maxSlice[:,:,:,None,None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
 
 contModel = 0
@@ -455,6 +469,10 @@ for modelFilename in modelFilenames:
         if normalizeInputMeanSlice:
             normSubject = meanSlice[sub, :].squeeze()
 
+        if normalizeInputMeanStdSlice:
+            normMeanSubject = meanSlice[sub, :].squeeze()
+            normStdSubject = stdSlice[sub, :].squeeze()
+
         if normalizeInputMeanGlobal:
             normSubject = meanGlobalSubjectNoisy[sub]
 
@@ -484,6 +502,9 @@ for modelFilename in modelFilenames:
 
         if normalizeInputMaxSlice:
             ndaOutputModel = ndaOutputModel * normSubject[:,None,None]
+
+        if normalizeInputMeanStdSlice:
+            ndaOutputModel = (ndaOutputModel * normStdSubject[:,None,None]) + normMeanSubject[:,None,None]
 
         if normalizeInputMeanGlobal:
             ndaOutputModel = ndaOutputModel * normSubject
