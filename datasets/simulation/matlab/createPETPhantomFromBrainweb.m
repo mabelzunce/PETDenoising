@@ -123,13 +123,13 @@ if pixelSize_mm ~= pixelSizePhantom_mm | imageSize_pixels ~= imageSizePhantom_pi
     coordZpet = (-pixelSize_mm(3)*imageSize_pixels(3)/2 + pixelSize_mm(3)/2) : pixelSize_mm(3) : (pixelSize_mm(3)*imageSize_pixels(3)/2);
     [Xpet, Ypet, Zpet] = meshgrid(coordXpet,coordYpet, coordZpet);
     % Interpolate the phantom image to the wanted coordinates:
-    pet_rescaled = interp3(Xphantom,Yphantom,Zphantom,pet,Xpet,Ypet,Zpet); 
+    pet_rescaled = single(interp3(Xphantom,Yphantom,Zphantom,pet,Xpet,Ypet,Zpet)); 
     pet_rescaled(isnan(pet_rescaled)) = 0;
-    mumap_rescaled = interp3(Xphantom,Yphantom,Zphantom,mumap,Xpet,Ypet,Zpet); 
+    mumap_rescaled = single(interp3(Xphantom,Yphantom,Zphantom,mumap,Xpet,Ypet,Zpet)); 
     mumap_rescaled(isnan(mumap_rescaled)) = 0;
-    t1_rescaled = interp3(Xphantom,Yphantom,Zphantom,t1,Xpet,Ypet,Zpet); 
+    t1_rescaled = single(interp3(Xphantom,Yphantom,Zphantom,t1,Xpet,Ypet,Zpet)); 
     t1_rescaled(isnan(t1_rescaled)) = 0;
-    t2_rescaled = interp3(Xphantom,Yphantom,Zphantom,t2,Xpet,Ypet,Zpet); 
+    t2_rescaled = single(interp3(Xphantom,Yphantom,Zphantom,t2,Xpet,Ypet,Zpet)); 
     t2_rescaled(isnan(t2_rescaled)) = 0;
     classified_tissue_rescaled = interp3(Xphantom,Yphantom,Zphantom,classified_tissue,Xpet,Ypet,Zpet, 'nearest'); 
     classified_tissue_rescaled(isnan(classified_tissue_rescaled)) = 0;
@@ -147,9 +147,9 @@ if pixelSize_mm ~= pixelSizePhantom_mm | imageSize_pixels ~= imageSizePhantom_pi
     maskGrayMatter(:,:,1:5) = 0;
     maskWhiteMatter(:,:,1:5) = 0;
 else
-    pet_rescaled = pet;
-    mumap_rescaled = mumap;
-    t1_rescaled = t1;
-    t2_rescaled = t2;
+    pet_rescaled = single(pet);
+    mumap_rescaled = single(mumap);
+    t1_rescaled = single(t1);
+    t2_rescaled = single(t2);
     classified_tissue_rescaled = classified_tissue;
 end

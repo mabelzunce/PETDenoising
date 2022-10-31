@@ -54,7 +54,7 @@ brainWebPath = '../../../data/BrainWebPhantoms/';
 imgDir = dir ([brainWebPath]);
 % First create low resolution phantoms of the same size of the
 % reconstructed image:
-for i = 3:length(imgDir)
+for i = 3 :length(imgDir)
     n = i-2;
     [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), ...
         PETrecon.image_size.matrixSize, PETrecon.image_size.voxelSize_mm);
@@ -82,7 +82,7 @@ for i = 3:length(imgDir)
 end
 
 % Now we create the high resolution phantom for the simulations:
-for i = 3:length(imgDir)
+for i = 3 :length(imgDir)
     n = i-2;
     [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(strcat(brainWebPath,imgDir(i).name), ...
         PETsimu.image_size.matrixSize, PETsimu.image_size.voxelSize_mm);
@@ -110,6 +110,7 @@ for i = 3:length(imgDir)
 end
 %% SIMULATION AND RECONSTRUCTION
 numIterations = 60;
+
 % Update nift info structure for the reconstruction image size:
 info.PixelDimensions = PETrecon.image_size.voxelSize_mm;
 info.ImageSize = PETrecon.image_size.matrixSize;
@@ -117,24 +118,26 @@ info.Datatype = 'single';
 % Coutns to simulate:
 fovFactor = 0.8; % The simulation does not account for the activity in the rest of the head.
 counts100perc = 469313098*fovFactor;
-countsPorcentaje = [100,50,25,10,5,1];
+countsPorcentaje = [100, 50,25,10,5,1];%[100,50,25,10,5,1];
 countsArray = round(counts100perc.*countsPorcentaje./100);
-
+% The noralization is the same for all thec ases:
+ncf = PETsimu.NCF; 
+nf = ncf; 
+nf(nf~=0) = 1./ nf(nf~=0); 
 for count = 1:size(countsArray,2)
     outputPathThisLevel = [outputPath '\' num2str(countsPorcentaje(count)) '\'];
     if ~isdir(outputPathThisLevel)
         mkdir(outputPathThisLevel)
     end
+    % Counts to simulate:
+    counts = countsArray(count); % Counts in the scaled ground truth.
+    randomsFraction = 0.1;  %eventos que coinciden en tiempo pero no son de la linea trazada
+    scatterFraction = 0.25; %efectos de la radiacion dispersa
+    truesFraction = 1 - randomsFraction - scatterFraction;
     for n = 1: size(pet_rescaled_all_images,2) 
         groundTruth{n} = pet_rescaled_all_images{n}; % The same as before
         groundTruthScaled{n} = groundTruth{n};
         attenuationMap{n} = mumap_rescaled_rescaled_all_images{n}; % para la recontruccion
-
-        % Counts to simulate:
-        counts = countsArray(count); % Counts in the scaled ground truth.
-        randomsFraction = 0.1;  %eventos que coinciden en tiempo pero no son de la linea trazada
-        scatterFraction = 0.25; %efectos de la radiacion dispersa
-        truesFraction = 1 - randomsFraction - scatterFraction;
 
         % Geometrical projection:
         y = PETsimu.P(groundTruthScaled{n}); % for any other span
@@ -142,33 +145,38 @@ for count = 1:size(countsArray,2)
         % Multiplicative correction factors:
         acf= PETsimu.ACF(attenuationMap{n}, refImage_all_images{n});
         % Convert into factors:
-        af = acf;
+        af = acf; 
         af(af~=0) = 1./ af(af~=0);
+        anf = af.*nf;
         % Introduce poission noise:
-        y = y.*af;
+        y = y.*anf;
         scale_factor = counts*truesFraction/sum(y(:));
         y = y.*scale_factor;
         y_poisson = poissrnd(y);
 
         % Additive factors:
-        r = PETsimu.R(counts*randomsFraction); 
+        counts_randoms = counts*randomsFraction;
+        r_withNorm = PETsimu.R(counts_randoms, ncf); % I pass the total coutns required and normalization factors).
         % Poisson distribution:
-        r = poissrnd(r);
+        r_poisson = poissrnd(r_withNorm);      
 
         counts_scatter = counts*scatterFraction;
         s_withoutNorm = PETsimu.S(y);
-        scale_factor_scatter = counts_scatter/sum(s_withoutNorm(:));
-        s_withoutNorm = s_withoutNorm .* scale_factor_scatter;
+        s_withNorm = s_withoutNorm.*nf;
+        scale_factor_scatter = counts_scatter/sum(s_withNorm(:));
+        s_withNorm = s_withNorm .* scale_factor_scatter;
         % noise for the scatter:
-        s = poissrnd(s_withoutNorm);
+        s_poisson = poissrnd(s_withNorm);
+
         % Add randoms and scatter@ and poisson noise
-        simulatedSinogram = y_poisson + s + r;
+        simulatedSinogram = y_poisson + s_poisson + r_poisson;
 
 
         % RECONSTRUCT the sinogram
-        sensImage = PETrecon.Sensitivity(af);
+        sensImage = PETrecon.Sensitivity(anf);
         recon = PETrecon.ones();
-        noisyDataSet3d{n} = PETrecon.OPOSEM(simulatedSinogram,s+r, sensImage,recon, ceil(numIterations/PETrecon.nSubsets));
+        additive = s_withNorm+r_withNorm;
+        noisyDataSet3d{n} = PETrecon.OPOSEM(simulatedSinogram, anf, additive, sensImage,recon, ceil(numIterations/PETrecon.nSubsets));
         %noisyDataSet2d{n} = permute(noisyDataSet2d{n}, [2 1 3]);
         %noisyDataSet2d{n} = noisyDataSet2d{n}(:,:,end:-1:1);
         niftiwriteresorted(noisyDataSet3d{n}, [outputPathThisLevel sprintf('noisyDataSet%d_Subject%d.nii',countsPorcentaje(count),n)], info, 1);
