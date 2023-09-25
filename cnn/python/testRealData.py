@@ -2,12 +2,8 @@ import torch
 import skimage
 from torchsummary import summary
 
-#from unet import Unet512
-#from unet import UnetDe1a16Hasta512
-#from unetM import Unet
 from unet import Unet
-#from unet import UnetWithResidual5Layers
-#from unet import UnetWithResidual
+from unet import UnetWithResidual
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
 from utils import showDataPlot
@@ -34,8 +30,10 @@ print(device)
 ######## CONFIG ###########
 normalizeInput = False
 normalizeInputMeanGlobal = False
-normalizeInputMaxGlobal = True
+normalizeInputMaxGlobal = False
 normalizeInputMaxSlice = False
+normalizeInputMeanSlice = True
+normalizeInputMeanStdSlice = False
 learning_rate=0.00005
 
 dataset = 'dataset_2'
@@ -43,6 +41,7 @@ dataset = 'dataset_2'
 # Subject
 batchSubjects = True
 batchSubjectsSize = 20
+
 
 saveFilterOutputAsNiftiImage = True
 saveModelOutputAsNiftiImage = True
@@ -57,35 +56,29 @@ path = os.getcwd()
 dataPath = '../../data/RealData/' + dataset + '/'
 
 # model
-#nameModel = 'Unet5LayersNewArchitecture_MSE_lr{0}_AlignTrue'.format(learning_rate)
-#nameModel = 'Unet5LayersNewArchitectureHasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-#nameModel = 'Unet6LayersNewArchitectureDe1a16Hasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-#nameModel = 'ResidualUnet5LayersWithoutRelu_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-#nameModel = 'ResidualUnet4LayersWithoutRelu_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-#nameModel = 'Unet4Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-#nameModel = 'Unet5Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
+nameModel = 'Unet_MSE_lr5e-05_AlignTrue_WithMeanSlice_2023'.format(learning_rate)
 
-nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-
-if normalizeInputMeanGlobal:
-    nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
-
-if normalizeInputMaxGlobal:
-    nameModel = nameModel+ '_GlobalMaxNorm_normMaxValue'
-
-if normalizeInput:
-    nameModel = nameModel + '_norm'
+# if normalizeInputMeanGlobal:
+#     nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
+#
+# if normalizeInputMaxGlobal:
+#     nameModel = nameModel+ '_GlobalMaxNorm_normMaxValue'
+#
+# if normalizeInputMaxSlice:
+#     nameModel = nameModel + '_norm'
+#
+# if normalizeInputMeanSlice:
+#     nameModel = nameModel + '_normMeanValue'
+#
+# if normalizeInputMeanStdSlice:
+#     nameModel = nameModel + '_normMeanStdValue'
 
 modelsPath = '../../results/' + nameModel + '/models/'
 modelFilenames = os.listdir(modelsPath)
 
 
 #model = UnetWithResidual(1,1)
-#model = Unet512(1,1,32)
-#model = UnetDe1a16Hasta512(1,1,16)
-#model = Unet()
 model = Unet(1,1)
-#model = UnetWithResidual5Layers(1, 1)
 
 #summary(model,(1,256,256))
 
@@ -104,6 +97,8 @@ meanGlobalSubjectNoisy = []
 maxGlobalSubjectNoisy = []
 noisyImagesArrayOrig = []
 
+groundTruthSubject = []
+
 for element in arrayPet:
     pathPetElement = pathImages+'/'+element
     name, extension = os.path.splitext(element)
@@ -115,13 +110,18 @@ for element in arrayPet:
     pet = sitk.GetArrayFromImage(petImg)
     pet = reshapeDataSet(pet)
 
+    name, extension = os.path.splitext(element)
+    if extension == '.nii':
+        name, extension2 = os.path.splitext(name)
+
+        if name == '100':
+            groundTruthSubject = pet
+
+
     if normalizeInputMeanGlobal:
         noisyImagesArrayOrig.append(pet)
 
-        X = np.ma.masked_equal(pet, 0)
-        nonZeros = np.sum((~(X.mask)))
-        pixelNonZeros = np.sum(pet)
-        meanGlobalSubjectNoisy.append(pixelNonZeros / nonZeros)
+        meanGlobalSubjectNoisy.append(np.mean(pet))
 
         pet = pet / meanGlobalSubjectNoisy[-1]
 
@@ -135,19 +135,36 @@ for element in arrayPet:
     petImages.append(pet)
 
 petImages = np.array(petImages)
+groundTruthSubject = np.array(groundTruthSubject).squeeze()
 
 # Get the maximum value per slice:
 maxSlice = petImages[:, :, :, :].max(axis=4).max(axis=3)
+meanSlice = petImages[:, :, :, :].mean(axis=4).mean(axis=3)
+stdSlice = petImages[:, :, :, :].std(axis=4).std(axis=3)
 # Normalize the input if necessary:
+
+if normalizeInputMeanStdSlice:
+    noisyImagesArrayOrig = petImages
+    noisyImagesArray = (petImages - meanSlice[:,:,:,None,None]) / stdSlice[:,:,:,None,None]
+    noisyImagesArray = np.nan_to_num(noisyImagesArray)
 
 if normalizeInputMaxSlice:
     noisyImagesArrayOrig = petImages
     noisyImagesArray = petImages/maxSlice[:,:,:,None,None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
+
+if normalizeInputMeanSlice:
+    noisyImagesArrayOrig = petImages
+    noisyImagesArray = petImages/meanSlice[:,:,:,None,None]
+    noisyImagesArray = np.nan_to_num(noisyImagesArray)
+
 if normalizeInputMeanGlobal or normalizeInputMaxGlobal:
     noisyImagesArray = petImages
 
-noisyImagesArrayOrig  = np.array(noisyImagesArrayOrig)
+if normalizeInputMeanGlobal == False and normalizeInputMaxGlobal == False and normalizeInputMaxSlice == False and normalizeInputMeanSlice == False and normalizeInputMeanStdSlice == False:
+    noisyImagesArray = petImages
+
+noisyImagesArrayOrig = np.array(noisyImagesArrayOrig)
 # ---------------------------- MASCARAS ----------------------------------------------- #
 
 whiteMatterMask_nii = sitk.ReadImage(dataPath+'mask/maskWhite.nii')
@@ -233,6 +250,8 @@ for dose in range(0, len(noisyImagesArrayOrig)):
     # METRICAS INPUT IMAGE
     mask = (noisyImagesSubject * greyMaskSubject)
     meanGreyMatterInputImagePerSlice[dose, :] = meanPerSlice(mask.reshape(mask.shape[0], -1))
+    mseGreyMatterInputImagePerSlice[dose, :] = mseValuePerSlice(noisyImagesSubject, groundTruthSubject, greyMaskSubject)
+    mseGreyMatterInputImagePerSubject[dose] = mseValuePerSubject(noisyImagesSubject, groundTruthSubject,greyMaskSubject)
     mask = (noisyImagesSubject * whiteMaskSubject)
     meanWhiteMatterInputImagePerSlice[dose, :] = meanPerSlice(mask.reshape(mask.shape[0], -1))
     crcInputImagePerSlice[dose, :] = crcValuePerSlice(noisyImagesSubject, greyMaskSubject, whiteMaskSubject)
@@ -247,11 +266,6 @@ for dose in range(0, len(noisyImagesArrayOrig)):
     meanGreyMatterInputImagePerSubject[dose] = meanPerSubject(meanGreyMatterInputImagePerSlice[dose, :])
     stdGreyMatterInputImagePerSubject[dose] = stdPerSubject(noisyImagesSubject * greyMaskSubject)
     stdWhiteMatterInputImagePerSubject[dose] = stdPerSubject(noisyImagesSubject * whiteMaskSubject)
-    meanGreyMatterInputImageGlobal = np.mean(meanGreyMatterInputImagePerSubject[:])
-    meanWhiteMatterInputImageGlobal = np.mean(meanWhiteMatterInputImagePerSubject[:])
-    mseGreyMatterInputImageGlobal = np.mean(mseGreyMatterInputImagePerSubject[:])
-    stdGreyMatterInputImageGlobal = np.mean(stdGreyMatterInputImagePerSubject[:])
-    stdWhiteMatterInputImageGlobal = np.mean(stdWhiteMatterInputImagePerSubject[:])
 
     # METRICAS FILTROS + INPUT IMAGE
     for fil in range(0, len(filtersStdDev_voxels)):
@@ -268,6 +282,8 @@ for dose in range(0, len(noisyImagesArrayOrig)):
 
         mask = (filter * greyMaskSubject)
         meanGreyMatterFilterPerSlice[fil,dose,:] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
+        mseGreyMatterFilterPerSlice[fil, dose, :] = mseValuePerSlice(filter, groundTruthSubject, greyMaskSubject)
+        mseGreyMatterFilterPerSubject[fil, dose] = mseValuePerSubject(filter, groundTruthSubject, greyMaskSubject)
         mask= (filter * whiteMaskSubject)
         meanWhiteMatterFilterPerSlice[fil,dose, :] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
 
@@ -296,10 +312,17 @@ for modelFilename in modelFilenames:
         noisyImagesSubject = noisyImagesArray[dose, :, :, :, :]
         if normalizeInputMaxSlice:
             normSubject = maxSlice[dose, :].squeeze()
+        if normalizeInputMeanSlice:
+            normSubject = meanSlice[dose, :].squeeze()
         if normalizeInputMeanGlobal:
             normSubject = meanGlobalSubjectNoisy[dose]
         if normalizeInputMaxGlobal:
             normSubject = maxGlobalSubjectNoisy[dose]
+
+        if normalizeInputMeanStdSlice:
+            normMeanSubject = meanSlice[dose, :].squeeze()
+            normStdSubject = stdSlice[dose, :].squeeze()
+
 
         print('PET DOSE ', namesPet[dose])
 
@@ -320,6 +343,12 @@ for modelFilename in modelFilenames:
         # Unnormalize if using normalization:
         if normalizeInputMaxSlice:
             ndaOutputModel = ndaOutputModel * normSubject[:,None,None]
+
+        if normalizeInputMeanSlice:
+            ndaOutputModel = ndaOutputModel * normSubject[:,None,None]
+
+        if normalizeInputMeanStdSlice:
+            ndaOutputModel = (ndaOutputModel * normStdSubject[:,None,None]) + normMeanSubject[:,None,None]
 
         if normalizeInputMeanGlobal:
             ndaOutputModel = ndaOutputModel * normSubject
@@ -351,6 +380,7 @@ for modelFilename in modelFilenames:
         allModelsMeanWMperSubject[contModel, dose] = meanPerSubject(allModelsMeanWM[contModel, dose, :])
         allModelsStdGreyMatterPerSubject[contModel, dose] = stdPerSubject(ndaOutputModel * greyMaskSubject)
         allModelsStdWhiteMatterPerSubject[contModel, dose] = stdPerSubject(ndaOutputModel * whiteMaskSubject)
+        allModelsGreyMatterMsePerSubject[contModel, dose] = mseValuePerSubject(ndaOutputModel, groundTruthSubject,greyMaskSubject)
 
         contModel = 0
 
@@ -361,18 +391,24 @@ saveDataCsv(crcInputImagePerSubject, 'crcInputImage_RealData_'+dataset+'_'+nameM
 saveDataCsv(covInputImagePerSubject, 'covInputImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(allModelsCOVperSubject, 'covModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(allModelsCRCperSubject, 'crcModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(allModelsGreyMatterMsePerSubject, 'mseModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterFilterPerSubject, 'meanGreyMatterFilterImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(meanWhiteMatterFilterPerSubject, 'meanWhiteMatterFilterImage_RealData_'+dataset+'_' + nameModel + '.csv', pathSaveResults)
 saveDataCsv(stdGreyMatterFilterPerSubject, 'stdGreyMatterFilterImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(stdWhiteMatterFilterPerSubject, 'stdWhiteMatterFilterImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterFilterPerSubject, 'mseGreyMatterFilterImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterInputImagePerSubject, 'meanGreyMatterInputImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(meanWhiteMatterInputImagePerSubject, 'meanWhiteMatterInputImage_RealData_'+dataset+'_' + nameModel + '.csv', pathSaveResults)
 saveDataCsv(stdGreyMatterInputImagePerSubject, 'stdGreyMatterInputImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(stdWhiteMatterInputImagePerSubject, 'stdWhiteMatterInputImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterInputImagePerSubject, 'mseGreyMatterInputImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(allModelsMeanGMperSubject, 'meanGreyMatterModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(allModelsGreyMatterMsePerSubject, 'mseGreyMatterModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(allModelsMeanWMperSubject, 'meanWhiteMatterModels_RealData_' +dataset+'_'+ nameModel + '.csv', pathSaveResults)
 saveDataCsv(allModelsStdGreyMatterPerSubject, 'stdGreyMatterModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(allModelsStdWhiteMatterPerSubject, 'stdWhiteMatterModels_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+
+

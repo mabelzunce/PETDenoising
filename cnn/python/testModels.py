@@ -9,9 +9,9 @@ import numpy as np
 import math
 
 #from unetM import Unet
-#from unet import Unet
+from unet import Unet
 #from unet import UnetDe1a16Hasta512
-from unet import UnetWithResidual
+#from unet import UnetWithResidual
 #from unet import UnetWithResidual5Layers
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
@@ -31,12 +31,15 @@ from utils import saveDataCsv
 from sklearn.model_selection import train_test_split
 
 ######## CONFIG ###########
-normalizeInput = False
+normalizeInput = True
 normalizeInputMeanGlobal = False
+normalizeInputMeanGlobalWithoutZeros = False
 normalizeInputMaxGlobal = False
 normalizeInputMeanStdSlice = False
-normalizeInputMeanSlice = False
+normalizeInputMeanSlice = True
 normalizeInputMaxSlice = False
+actScaleFactor = False
+
 learning_rate=0.00005
 lowDose_perc = 5
 epoch = 23
@@ -76,35 +79,7 @@ print(device)
 path = os.getcwd()
 
 # model
-#nameModel = 'ResidualUnet5LayersWithoutRelu_MSE_lr{0}_AlignTrue'.format(learning_rate)
-#nameModel = 'Unet5LayersNewArchitecture_MSE_lr{0}_AlignTrue'.format(learning_rate)
-
-#nameModel = 'Unet5LayersNewArchitectureHasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-#nameModel = 'Unet6LayersNewArchitectureDe1a16Hasta512_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-
-#nameModel = 'Unet5Layers_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-
-#nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue'.format(learning_rate)
-
-#nameModel = 'Unet5LayersNewArchitecture_MSE_lr5e-05_AlignTrue_MeanNorm_2023'.format(learning_rate)
-
-#nameModel = 'UnetResidual5LayersNewArchitecture_MSE_lr5e-05_AlignTrue_GLOBALMeanNorm_2023_NUEVA'.format(learning_rate)
-
-#nameModel = 'UnetResidual5LayersNewArchitecture_MSE_lr5e-05_AlignTrue_SliceMeanNorm_2023_NUEVA'.format(learning_rate)
-
-nameModel =  'UnetResidual5LayersNewArchitecture_MSE_lr5e-05_AlignTrue_WithoutNorm_2023'.format(learning_rate)
-
-if normalizeInputMeanSlice:
-    nameModel = nameModel + '_normMeanValue'
-if normalizeInputMaxSlice:
-    nameModel = nameModel + '_norm'
-if normalizeInputMeanGlobal:
-    #nameModel = nameModel+ '_GlobalMeanNorm_normMeanValue'
-    nameModel = nameModel + '_normMeanValue'
-if normalizeInputMaxGlobal:
-    nameModel = nameModel+ '_GlobalMaxNorm_normMaxValue'
-if normalizeInputMeanStdSlice:
-    nameModel = nameModel + '_normMeanStdValue'
+nameModel = 'Unet_MSE_lr5e-05_AlignTrue_WithMeanSlice_2023'.format(learning_rate)
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -119,11 +94,9 @@ pathSaveResults = '../../results/' + nameModel + '/'
 
 ########### CREATE MODEL ###########
 #model = Unet()
-model = UnetWithResidual(1,1)
-#model = Unet512(1,1,32)
-#model = UnetDe1a16Hasta512(1,1,16)
-#model = Unet(1,1)
-#model = UnetWithResidual5Layers(1, 1)
+#model = UnetWithResidual(1,1)
+model = Unet(1,1)
+
 
 ########## LIST OF MODELS ###############
 modelFilenames = os.listdir(modelsPath)
@@ -200,7 +173,6 @@ for element in arrayGroundTruth:
 
         # read greyMask
         nameGreyMask = 'Phantom_' + name + '_grey_matter.nii'
-        #nameGreyMask = 'Subject' + name + 'GreyMask.nii'
         pathGreyMaskElement = pathPhantoms + '/' + nameGreyMask
         greyMask = sitk.ReadImage(pathGreyMaskElement)
         greyMask = sitk.GetArrayFromImage(greyMask)
@@ -208,7 +180,6 @@ for element in arrayGroundTruth:
 
         # read whiteMask
         nameWhiteMask = 'Phantom_' + name + '_white_matter.nii'
-        #nameWhiteMask = 'Subject' + name + 'WhiteMask.nii'
         pathWhiteMaskElement = pathPhantoms + '/' + nameWhiteMask
         whiteMask = sitk.ReadImage(pathWhiteMaskElement)
         whiteMask = sitk.GetArrayFromImage(whiteMask)
@@ -216,24 +187,22 @@ for element in arrayGroundTruth:
 
         if normalizeInputMeanGlobal:
             subjectsNames.append(name)
-
-            # X = np.ma.masked_equal(noisyDataSet, 0)
-            # nonZeros = np.sum((~(X.mask)))
-            # pixelNonZeros = np.sum(noisyDataSet)
-            # meanGlobalSubjectNoisy.append(pixelNonZeros / nonZeros)
-            #
-
             meanGlobalSubjectNoisy.append(np.mean(noisyDataSet))
             noisyImagesArrayOrig.append(noisyDataSet)
-
             noisyDataSet = noisyDataSet/meanGlobalSubjectNoisy[-1]
+
+        if normalizeInputMeanGlobalWithoutZeros:
+            X = np.ma.masked_equal(noisyDataSet, 0)
+            nonZeros = np.sum((~(X.mask)))
+            pixelNonZeros = np.sum(noisyDataSet)
+            meanSubjectNoisy = pixelNonZeros / nonZeros
+            meanGlobalSubjectNoisy.append(meanSubjectNoisy)
+            noisyDataSet = (noisyDataSet / meanGlobalSubjectNoisy[-1])
 
         if normalizeInputMaxGlobal:
             subjectsNames.append(name)
             maxGlobalSubjectNoisy.append(noisyDataSet.max())
-
             noisyImagesArrayOrig.append(noisyDataSet)
-
             noisyDataSet = noisyDataSet/maxGlobalSubjectNoisy[-1]
 
         nameGroundTruth.append(name)
@@ -242,28 +211,19 @@ for element in arrayGroundTruth:
         greyMaskArray.append(greyMask)
         whiteMaskArray.append(whiteMask)
 
+
 noisyImagesArray = np.array(noisyImagesArray)
 groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
 greyMaskArray = np.array(greyMaskArray)
 
-if normalizeInputMeanGlobal or maxGlobalSubjectNoisy:
+if normalizeInputMeanGlobal or normalizeInputMaxGlobal or normalizeInputMeanGlobalWithoutZeros:
     noisyImagesArrayOrig = np.array(noisyImagesArrayOrig)
 
 # Get the maximum value per slice:
 # Normalize the input if necessary:
 if normalizeInputMeanSlice:
     noisyImagesArrayOrig = noisyImagesArray
-    # X = np.ma.masked_equal(noisyImagesArray, 0)
-    # nonZeros = np.sum(np.sum((~(X.mask)),axis=4),axis=3)
-    # pixelNonZeros = np.sum(np.sum(noisyImagesArray,axis= 4),axis = 3)
-    # meanSlice = pixelNonZeros / nonZeros
-    #
-    # noisyImagesArray = noisyImagesArray / meanSlice [:,:,:,None,None]
-    # noisyImagesArray = np.nan_to_num(noisyImagesArray)
-    #
-    # noisyImagesArray = np.float32(noisyImagesArray)
-
     meanSlice = np.mean(np.mean(np.mean(noisyImagesArray, axis=-1), axis=-1),axis=-1)
     noisyImagesArray = noisyImagesArray / meanSlice[:,:,None,None, None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
@@ -273,24 +233,17 @@ if normalizeInputMeanStdSlice:
     noisyImagesArrayOrig = noisyImagesArray
     meanSlice = noisyImagesArray[:, :, :, :].mean(axis=4).mean(axis=3)
     stdSlice = noisyImagesArray[:, :, :, :].std(axis=4).std(axis=3)
-    meanSliceGroundTruth = groundTruthArray[:, :, :, :].mean(axis=4).mean(axis=3)
     noisyImagesArray = (noisyImagesArray - meanSlice[:,:,:,None,None]) / stdSlice[:,:,:,None,None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
 
 
-
 if normalizeInputMaxSlice:
-    noisyImagesArray = noisyImagesArray * 20
-
     noisyImagesArrayOrig = noisyImagesArray
 
     maxSlice = noisyImagesArray[:, :, :, :].max(axis=4).max(axis=3)
-    maxSliceGroundTruth = groundTruthArray[:, :, :, :].max(axis=4).max(axis=3)
     noisyImagesArray = noisyImagesArray / maxSlice[:,:,:,None,None]
     noisyImagesArray = np.nan_to_num(noisyImagesArray)
 
-if normalizeInput == False:
-    noisyImagesArrayOrig = noisyImagesArray
 
 contModel = 0
 modelName = []
@@ -521,6 +474,9 @@ for modelFilename in modelFilenames:
         if normalizeInputMeanGlobal:
             normSubject = meanGlobalSubjectNoisy[sub]
 
+        if normalizeInputMeanGlobalWithoutZeros:
+            normSubject = meanGlobalSubjectNoisy[sub]
+
         if normalizeInputMaxGlobal:
             normSubject = maxGlobalSubjectNoisy[sub]
 
@@ -531,8 +487,7 @@ for modelFilename in modelFilenames:
             numBatches = np.round(noisyImagesSubject.shape[0] / batchSubjectsSize).astype(int)
             # Run the model for all the slices:
             for i in range(numBatches):
-                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(
-                noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
+                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
             ndaOutputModel = outModel
         else:
             outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
@@ -552,6 +507,9 @@ for modelFilename in modelFilenames:
             ndaOutputModel = (ndaOutputModel * normStdSubject[:,None,None]) + normMeanSubject[:,None,None]
 
         if normalizeInputMeanGlobal:
+            ndaOutputModel = ndaOutputModel * normSubject
+
+        if normalizeInputMeanGlobalWithoutZeros:
             ndaOutputModel = ndaOutputModel * normSubject
 
         if normalizeInputMaxGlobal:
