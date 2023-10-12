@@ -11,7 +11,7 @@ import math
 #from unetM import Unet
 from unet import Unet
 #from unet import UnetDe1a16Hasta512
-#from unet import UnetWithResidual
+from unet import UnetWithResidual
 #from unet import UnetWithResidual5Layers
 from utils import reshapeDataSet
 from utils import mseValuePerSlice
@@ -34,9 +34,10 @@ from sklearn.model_selection import train_test_split
 normalizeInput = True
 normalizeInputMeanGlobal = False
 normalizeInputMeanGlobalWithoutZeros = False
+normalizeInputMeanSliceWithoutZeros = True
 normalizeInputMaxGlobal = False
 normalizeInputMeanStdSlice = False
-normalizeInputMeanSlice = True
+normalizeInputMeanSlice = False
 normalizeInputMaxSlice = False
 actScaleFactor = False
 
@@ -79,7 +80,7 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'Unet_MSE_lr5e-05_AlignTrue_WithMeanSlice_2023'.format(learning_rate)
+nameModel = 'Unet_MSE_lr5e-05_AlignTrue_MeanSliceWithoutZeros_2023'.format(learning_rate)
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -142,6 +143,9 @@ maxGlobalSubjectNoisy = []
 subjectsNames = []
 noisyImagesArrayOrig = []
 
+meanSlicesWithoutZeros = np.zeros((4,127))
+cont = 0
+
 for element in arrayGroundTruth:
     pathGroundTruthElement = pathGroundTruth+'/'+element
 
@@ -162,6 +166,7 @@ for element in arrayGroundTruth:
     prueba = []
 
     if int(name) in idxConjunto:
+
         print(name)
         # read noisyDataSet
         nametrainNoisyDataSet = 'noisyDataSet' + str(lowDose_perc) + '_Subject' + name + '.nii'
@@ -192,6 +197,7 @@ for element in arrayGroundTruth:
             noisyDataSet = noisyDataSet/meanGlobalSubjectNoisy[-1]
 
         if normalizeInputMeanGlobalWithoutZeros:
+            noisyImagesArrayOrig.append(noisyDataSet)
             X = np.ma.masked_equal(noisyDataSet, 0)
             nonZeros = np.sum((~(X.mask)))
             pixelNonZeros = np.sum(noisyDataSet)
@@ -205,6 +211,18 @@ for element in arrayGroundTruth:
             noisyImagesArrayOrig.append(noisyDataSet)
             noisyDataSet = noisyDataSet/maxGlobalSubjectNoisy[-1]
 
+        if normalizeInputMeanSliceWithoutZeros:
+            noisyImagesArrayOrig.append(noisyDataSet.copy())
+            for slice in range(0, noisyDataSet.shape[0]):
+                X = np.ma.masked_equal(noisyDataSet[slice,:,:], 0)
+                nonZeros = np.sum((~(X.mask)))
+                pixelNonZeros = np.sum(noisyDataSet[slice,:,:])
+                meanSubjectNoisy = pixelNonZeros / nonZeros
+                meanSlicesWithoutZeros [cont, slice] = meanSubjectNoisy
+                noisyDataSet[slice,:,:] = (noisyDataSet[slice,:,:] / meanSubjectNoisy)
+
+        cont = cont + 1
+
         nameGroundTruth.append(name)
         groundTruthArray.append(groundTruth)
         noisyImagesArray.append(noisyDataSet)
@@ -217,7 +235,7 @@ groundTruthArray = np.array(groundTruthArray)
 whiteMaskArray = np.array(whiteMaskArray)
 greyMaskArray = np.array(greyMaskArray)
 
-if normalizeInputMeanGlobal or normalizeInputMaxGlobal or normalizeInputMeanGlobalWithoutZeros:
+if normalizeInputMeanGlobal or normalizeInputMaxGlobal or normalizeInputMeanGlobalWithoutZeros or normalizeInputMeanSliceWithoutZeros:
     noisyImagesArrayOrig = np.array(noisyImagesArrayOrig)
 
 # Get the maximum value per slice:
@@ -477,6 +495,9 @@ for modelFilename in modelFilenames:
         if normalizeInputMeanGlobalWithoutZeros:
             normSubject = meanGlobalSubjectNoisy[sub]
 
+        if normalizeInputMeanSliceWithoutZeros:
+            normSubject = meanSlicesWithoutZeros[sub, :]
+
         if normalizeInputMaxGlobal:
             normSubject = maxGlobalSubjectNoisy[sub]
 
@@ -507,6 +528,9 @@ for modelFilename in modelFilenames:
             ndaOutputModel = (ndaOutputModel * normStdSubject[:,None,None]) + normMeanSubject[:,None,None]
 
         if normalizeInputMeanGlobal:
+            ndaOutputModel = ndaOutputModel * normSubject
+
+        if normalizeInputMeanGlobalWithoutZeros:
             ndaOutputModel = ndaOutputModel * normSubject
 
         if normalizeInputMeanGlobalWithoutZeros:
