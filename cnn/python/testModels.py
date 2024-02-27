@@ -9,7 +9,7 @@ import numpy as np
 import math
 
 #from unetM import Unet
-#from unet import Unet
+from unet import Unet
 #from unet import UnetDe1a16Hasta512
 from unet import UnetWithResidual
 #from unet import UnetWithResidual5Layers
@@ -61,7 +61,8 @@ saveFilterOutputAsNiftiImageOneSubject = True
 saveDataCSV = True
 ###########################
 
-normSliceMeanStd = True
+normSliceMeanStd = False
+normMeanSlice = True
 
 ######################### CHECK DEVICE ######################
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -74,7 +75,7 @@ print(device)
 path = os.getcwd()
 
 # model
-nameModel = 'Unet_MSE_lr5e-05_AlignTrue_MeanStdSlice'.format(learning_rate)
+nameModel = 'UnetResidual_MSE_lr5e-05_AlignTrue_MeanSlice'.format(learning_rate)
 
 modelsPath = '../../results/' + nameModel + '/models/'
 
@@ -94,7 +95,6 @@ pathGreyMatter = dataPath+'/grey mask'
 pathWhiteMatter = dataPath+'/white mask'
 
 ########### CREATE MODEL ###########
-#model = Unet()
 model = UnetWithResidual(1,1)
 #model = Unet(1,1)
 
@@ -193,9 +193,24 @@ outModel = np.zeros((noisyDataSetArray.shape[0], 1,noisyDataSetArray.shape[2], n
 
 
 if normSliceMeanStd == True:
-    meanSubjectNoisy = np.mean(np.mean(noisyDataSet.squeeze(), axis=1), axis=1)
-    stdSubjectNoisy = np.std(np.std(noisyDataSet.squeeze(), axis=1), axis=1)
-    subjectNoisyNorm = (noisyDataSet - meanSubjectNoisy[:, None,None, None]) / stdSubjectNoisy[:, None,None, None]
+    meanSubjectNoisy = np.mean(np.mean(noisyDataSet, axis=-1), axis=-1)
+    stdSubjectNoisy = np.std(np.std(noisyDataSet, axis=-1), axis=-1)
+    stdSubjectNoisy = np.where(stdSubjectNoisy == 0, np.nan, stdSubjectNoisy)
+    subjectNoisyNorm = (noisyDataSet - meanSubjectNoisy[:,:, None, None]) / stdSubjectNoisy[:,:, None, None]
+    subjectNoisyNorm = np.nan_to_num(subjectNoisyNorm)
+
+if normMeanSlice:
+    meanSubjectNoisy = np.mean(np.mean(noisyDataSet, axis=-1), axis=-1)
+
+    meanSubjectNoisy = np.where(meanSubjectNoisy == 0, np.nan, meanSubjectNoisy)
+
+    subjectNoisyNorm = noisyDataSet / meanSubjectNoisy[:,:, None, None]
+    subjectNoisyNorm = np.nan_to_num(subjectNoisyNorm)
+
+if normMeanSlice == False and normSliceMeanStd == False:
+    subjectNoisyNorm = noisyDataSet
+
+
 
 ### Model
 for modelFilename in modelFilenames:
@@ -206,7 +221,7 @@ for modelFilename in modelFilenames:
         numBatches = np.round(noisyDataSetArray.shape[0] / batchSubjectsSize).astype(int)
         # Run the model for all the slices:
         for i in range(numBatches):
-            outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(noisyDataSet[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
+            outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(subjectNoisyNorm[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
         ndaOutputModel = outModel
     else:
         outModel = RunModel(model, torch.from_numpy(noisyDataSet))
@@ -216,9 +231,11 @@ for modelFilename in modelFilenames:
         ndaOutputModel = ndaOutputModel.squeeze()  # Remove the channel dimension
         # Unnormalize if using normalization:
 
-    if normSliceMeanStd == True:
-        outModel = (outModel * stdSubjectNoisy[:, None,None, None]) + meanSubjectNoisy[:, None,None, None]
+    if normSliceMeanStd:
+        ndaOutputModel = ndaOutputModel  * stdSubjectNoisy[:,:, None, None] + meanSubjectNoisy[:,:, None, None]
 
+    if normMeanSlice:
+        ndaOutputModel = ndaOutputModel * meanSubjectNoisy[:, :, None, None]
 
 image = sitk.GetImageFromArray(np.array(ndaOutputModel.squeeze()))
 image.SetSpacing(voxelSize_mm)

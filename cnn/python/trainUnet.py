@@ -32,7 +32,7 @@ print(device)
 
 ######################## TRAINING PARAMETERS ###############
 batchSize = 8
-epochs = 100
+epochs = 150
 learning_rate=0.00005
 printStep_epochs = 1
 plotStep_epochs = 5
@@ -44,8 +44,9 @@ fullDose = 100
 
 ## Type of normalization ##
 normMeanStdSlice = True
+normMeanSlice = False
 
-nameThisNet = 'UnetResidual _MSE_lr5e-05_AlignTrue_MeanStdSlice'.format(learning_rate)
+nameThisNet = 'UnetResidual_MSE_lr5e-05_AlignTrue_MeanStdSlice'.format(learning_rate)
 
 outputPath = '../../results/' + nameThisNet + '/'
 
@@ -73,9 +74,6 @@ groundTruthDataSet = sitk.GetArrayFromImage(groundTruth)
 noisyDataSet = sitk.ReadImage(pathNoisyDataSet+'/NoisyDataSet_dose_5.nii')
 noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
 
-noisyDataSet = sitk.ReadImage(pathNoisyDataSet+'/NoisyDataSet_dose_5.nii')
-noisyDataSet = sitk.GetArrayFromImage(noisyDataSet)
-
 greyMatter = sitk.ReadImage(pathGreyMatter+'/greyMaskDataSet.nii')
 greyMatter = sitk.GetArrayFromImage(greyMatter)
 
@@ -92,42 +90,72 @@ validWhiteMask = []
 trainNoisyDataSet = []
 trainGroundTruth = []
 
+if normMeanSlice:
+    meanSubjectNoisy = np.mean(np.mean(noisyDataSet, axis=-1), axis=-1)
+    meanSubjectGroundTruth = np.mean(np.mean(groundTruthDataSet, axis=-1), axis=-1)
+
+    meanSubjectNoisy = np.where(meanSubjectNoisy == 0, np.nan, meanSubjectNoisy)
+    meanSubjectGroundTruth = np.where(meanSubjectGroundTruth == 0, np.nan, meanSubjectGroundTruth)
+
+    subjectNoisyNorm = noisyDataSet / meanSubjectNoisy[:, None, None]
+    subjectGroundTruthNorm = groundTruthDataSet /meanSubjectGroundTruth[:, None, None]
+
+    subjectNoisyNorm = np.nan_to_num(subjectNoisyNorm, nan=0)
+    subjectGroundTruthNorm = np.nan_to_num(subjectGroundTruthNorm, nan=0)
+
 if normMeanStdSlice:
     meanSubjectNoisy = np.mean(np.mean(noisyDataSet, axis=1), axis=1)
     meanSubjectGroundTruth = np.mean(np.mean(groundTruthDataSet, axis=1), axis=1)
 
     stdSubjectNoisy = np.std(np.std(noisyDataSet, axis=1), axis=1)
+    stdSubjectNoisy = np.where(stdSubjectNoisy == 0, np.nan, stdSubjectNoisy)
+
     stdSubjectGroundTruth = np.std(np.std(groundTruthDataSet, axis=1), axis=1)
+    stdSubjectGroundTruth = np.where(stdSubjectGroundTruth == 0, np.nan, stdSubjectGroundTruth)
 
     subjectNoisyNorm = (noisyDataSet - meanSubjectNoisy[:, None, None]) / stdSubjectNoisy[:, None, None]
     subjectGroundTruthNorm = (groundTruthDataSet - meanSubjectGroundTruth[:, None, None]) / stdSubjectGroundTruth[:, None, None]
 
+    subjectNoisyNorm = np.nan_to_num(subjectNoisyNorm, nan=0)
+    subjectGroundTruthNorm = np.nan_to_num(subjectGroundTruthNorm, nan=0)
+
+if normMeanStdSlice == False and normMeanSlice == False:
+    subjectNoisyNorm = noisyDataSet
+    subjectGroundTruthNorm = groundTruthDataSet
+
+
+validNoisyDataSetToSave = []
+validGroundTruthToSave = []
+
 for slc in range(0,len(noisyDataSet)):
     if slc in numerosAleatorios:
-        validNoisyDataSet.append(noisyDataSet[slc].copy())
-        validGroundTruth.append(groundTruthDataSet[slc].copy())
+        validNoisyDataSetToSave.append(noisyDataSet[slc].copy())
+        validNoisyDataSet.append(subjectNoisyNorm[slc].copy())
+        validGroundTruthToSave.append(groundTruthDataSet[slc].copy())
+        validGroundTruth.append(subjectGroundTruthNorm[slc].copy())
         validGreyMask.append(greyMatter[slc].copy())
         validWhiteMask.append(whiteMatter[slc].copy())
 
     else:
-        trainNoisyDataSet.append(noisyDataSet[slc].copy())
-        trainGroundTruth.append(groundTruthDataSet[slc].copy())
-
+        trainNoisyDataSet.append(subjectNoisyNorm[slc].copy())
+        trainGroundTruth.append(subjectGroundTruthNorm[slc].copy())
 
 
 trainGroundTruth = np.array(trainGroundTruth)
 validGroundTruth = np.array(validGroundTruth)
+validGroundTruthToSave = np.array(validGroundTruthToSave)
 
 trainNoisyDataSet = np.array(trainNoisyDataSet)
 validNoisyDataSet = np.array(validNoisyDataSet)
+validNoisyDataSetToSave = np.array(validNoisyDataSetToSave)
 
-image = sitk.GetImageFromArray(np.array(validGroundTruth))
+image = sitk.GetImageFromArray(np.array(validGroundTruthToSave))
 image.SetSpacing(voxelSize_mm)
 nameImage = 'validGroundTruth_dose_' + str(lowDose_perc) + '.nii'
 save_path = os.path.join(outputPath, nameImage)
 sitk.WriteImage(image, save_path)
 
-image = sitk.GetImageFromArray(np.array(validNoisyDataSet))
+image = sitk.GetImageFromArray(np.array(validNoisyDataSetToSave))
 image.SetSpacing(voxelSize_mm)
 nameImage = 'validNoisyDataset.nii'
 save_path = os.path.join(outputPath, nameImage)
