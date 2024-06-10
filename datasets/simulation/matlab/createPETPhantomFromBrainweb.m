@@ -11,7 +11,7 @@
 % an attenuation map.
 % Calling example: [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, refImage] = createPETPhantomFromBrainweb('subject43_crisp_v.rawb', [344 344 127], [2.08625 2.08625 2.03125]);
 
-function [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(binaryFilename, imageSize_pixels, pixelSize_mm)
+function [pet_rescaled, mumap_rescaled, t1_rescaled, t2_rescaled, classified_tissue_rescaled, maskGrayMatter, maskWhiteMatter, refImage] = createPETPhantomFromBrainweb(binaryFilename, imageSize_pixels, pixelSize_mm,contrast_ratio)
 %% PARAMETERS
 imageSizePhantom_pixels = [362 434 362];
 pixelSizePhantom_mm = [0.5 0.5 0.5];
@@ -21,6 +21,7 @@ if nargin == 1
     pixelSize_mm = [0.5 0.5 0.5];
     % The size in pixels:
     imageSize_pixels = [362 434 362];
+    contrast_ratio = 4;
 end
 %% READ BINARY IMAGE
 % Read image:
@@ -64,7 +65,7 @@ mumap(indicesBone) = mu_bone_1_cm;
 
 %% TRANSFORM THE ATANOMY INTO PET SIGNALS
 whiteMatterAct = 32;
-grayMatterAct = 128;
+grayMatterAct = whiteMatterAct * contrast_ratio;
 skinAct = 16;
 pet = phantom;
 pet(maskWhiteMatter) = whiteMatterAct;
