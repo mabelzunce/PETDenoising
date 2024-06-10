@@ -285,6 +285,3 @@ if saveDataCSV == True:
 
     saveDataCsv(meanGreyMatterFilterPerSlice.T,'meanGreyMatterFilter '+ ' _dose_' + str(lowDose_perc) + '.csv',pathSaveResults)
     saveDataCsv(stdGreyMatterFilterPerSlice.T, 'stdInputImagePerSliceFilter' + nameModel +  '_dose_' + str(lowDose_perc) + '.csv',pathSaveResults)
-    saveDataCsv(mseFilterPerSlice.T,'mseInputImagePerSliceFilter' + nameModel +  '_dose_' + str(lowDose_perc) + '.csv',pathSaveResults)
-    saveDataCsv(covFilterPerSlice.T, 'covFilter ' + nameModel + ' _dose_' + str(lowDose_perc) + '.csv',pathSaveResults)
-    saveDataCsv(crcFilterPerSlice.T, 'crcFilter ' + nameModel + ' _dose_' + str(lowDose_perc) + '.csv', pathSaveResults)
