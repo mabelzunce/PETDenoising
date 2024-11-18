@@ -5,9 +5,11 @@ import math
 import pandas as pd
 import numpy as np
 import SimpleITK as sitk
+import matplotlib
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import ImageGrid
 from datetime import datetime
+matplotlib.use('Qt5Agg')
 
 def imshow(img, min=0, max=1):
     img = img
@@ -84,7 +86,7 @@ def MSE(img1, img2, cantPixels = None):
     return error
 
 def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epochs, device, pre_trained = False, save = True, saveInterval_epochs = 5, outputPath = './', name = 'Net',
-               printStep_batches = math.inf, plotStep_batches = math.inf, printStep_epochs = 1, plotStep_epochs = 1):
+               printStep_batches = math.inf, plotStep_batches = math.inf, printStep_epochs = 5, plotStep_epochs = 5):
     # defino batches
     # Return
     # lossValuesTrainingSet: loss por batch para trainSet
@@ -125,6 +127,14 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
     lossValuesDevSetAllEpoch = []
     lossValueTrainingSetAllEpoch = []
 
+    meanPerBatchInputsTrain=[]
+    meanPerBatchGTTrain = []
+    meanPerBatchOutputTrain = []
+
+    meanPerBatchInputsValid = []
+    meanPerBatchGTValid = []
+    meanPerBatchOutputValid = []
+
     # Transfer tensors and model to device:
     model.to(device)
 
@@ -158,6 +168,103 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
             lossValuesTrainingSetEpoch.append(loss.item())
             iterationNumbers.append(iter)
 
+            # if (loss.item()) > 1.2:
+            #     if outputs.is_cuda:
+            #         inputs_save = outputs.cpu()
+            #     inputs_save = inputs_save.detach().numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'OUT, Worst batch, Batch {0}, Loss {1}.nii'.format(i, loss.item())
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if inputs.is_cuda:
+            #         inputs_save = inputs.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'INPUT, Worst batch, Batch {0}, Loss {1}.nii'.format(i, loss.item())
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if gt.is_cuda:
+            #         inputs_save = gt.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'GT, Worst batch, Batch {0}, Loss {1}.nii'.format(i, loss.item())
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            # if (loss.item()) < 0.0019:
+            #     if outputs.is_cuda:
+            #         inputs_save = outputs.cpu()
+            #     inputs_save = inputs_save.detach().numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'OUT, Best batch, Batch {0}, Loss {1}.nii'.format(i, loss.item())
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if inputs.is_cuda:
+            #         inputs_save = inputs.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'INPUT, Best batch, Batch {0}, Loss {1}.nii'.format(i, loss.item())
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if gt.is_cuda:
+            #         inputs_save = gt.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'GT, Best batch, Batch {0}, Loss {1}.nii'.format(i, loss.item())
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+
+
+            # meanPerBatchInputsTrain.append(inputs.mean().cpu().numpy())
+            # meanPerBatchGTTrain.append(gt.mean().cpu().numpy())
+            # meanPerBatchOutputTrain.append(outputs.mean().cpu().detach().numpy())
+
+            # if i == 1220 and epoch==0:
+            # #if i == 0 and epoch == 0:
+            #     if outputs.is_cuda:
+            #         inputs_save = outputs.cpu()
+            #
+            #     inputs_save = inputs_save.detach().numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:,0,:,:])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'Output first epoch last batch.nii'
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if inputs.is_cuda:
+            #         inputs_save = inputs.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:,0,:,:])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'Input first epoch last batch.nii'
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if gt.is_cuda:
+            #         inputs_save = gt.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:,0,:,:])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'Gt first epoch last batch.nii'
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+
             if (i % printStep_batches) == (printStep_batches - 1):  # print every printStep mini-batches
                 print('[%d, %5d] loss: %.3f' %
                       (epoch + 1, i + 1, running_loss))
@@ -188,10 +295,23 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
                 plt.pause(0.0001)
                 plt.savefig(outputPath + name + '_training_batch_{0}_epoch_{1}.png'.format(i, epoch))
 
+        # nameArch = outputPath + name + 'meanPerBatchInputsTrain'.format(epoch) + '.xlsx'
+        # df = pd.DataFrame(meanPerBatchInputsTrain)
+        # df.to_excel(nameArch)
+        #
+        # nameArch = outputPath + name + 'meanPerBatchGTTrain'.format(epoch) + '.xlsx'
+        # df = pd.DataFrame(meanPerBatchGTTrain)
+        # df.to_excel(nameArch)
+        #
+        # nameArch = outputPath + name + 'meanPerBatchOutputTrain'.format(epoch) + '.xlsx'
+        # df = pd.DataFrame(meanPerBatchOutputTrain)
+        # df.to_excel(nameArch)
+
         lossValueTrainingSetAllEpoch.append(np.mean(lossValuesTrainingSetEpoch))
         model.train(False)
         running_vloss = 0.0
 
+        i=0
         for i in range(numBatchesValid):
             vinputs = torch.from_numpy(validSet['input'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
             vgt = torch.from_numpy(validSet['output'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
@@ -205,8 +325,57 @@ def trainModel(model, trainSet, validSet, criterion, optimizer, num_batch, epoch
                       (epoch + 1, i + 1, vloss.item()))
             lossValuesDevSet.append(vloss.item())
             lossValuesDevSetEpoch.append(vloss.item())
+
+            # meanPerBatchInputsValid.append(vinputs.mean().cpu().numpy())
+            # meanPerBatchGTValid.append(vgt.mean().cpu().numpy())
+            # meanPerBatchOutputValid.append(voutputs.mean().cpu().detach().numpy())
+            #
+            # if i == 135 and epoch == 0:
+            # #if i == 0 and epoch == 0:
+            #     if voutputs.is_cuda:
+            #         inputs_save = voutputs.cpu()
+            #
+            #     inputs_save = inputs_save.detach().numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'Valid utput first epoch last batch.nii'
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if vinputs.is_cuda:
+            #         inputs_save = vinputs.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'Valid input first epoch last batch.nii'
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+            #
+            #     if vgt.is_cuda:
+            #         inputs_save = vgt.cpu()
+            #
+            #     inputs_save = inputs_save.numpy()
+            #     image = sitk.GetImageFromArray(inputs_save[:, 0, :, :])
+            #     # image.SetSpacing(voxelSize_mm)
+            #     nameImage = 'Valid gt first epoch last batch.nii'
+            #     save_path = os.path.join(outputPath, nameImage)
+            #     sitk.WriteImage(image, save_path)
+
         avg_vloss = np.mean(lossValuesDevSetEpoch)
         lossValuesDevSetAllEpoch.append(np.mean(lossValuesDevSetEpoch))
+
+        # nameArch = outputPath + name + 'meanPerBatchInputsValid'.format(epoch) + '.xlsx'
+        # df = pd.DataFrame(meanPerBatchInputsValid)
+        # df.to_excel(nameArch)
+        #
+        # nameArch = outputPath + name + 'meanPerBatchGTValid'.format(epoch) + '.xlsx'
+        # df = pd.DataFrame(meanPerBatchGTValid)
+        # df.to_excel(nameArch)
+        #
+        # nameArch = outputPath + name + 'meanPerBatchOutputValid'.format(epoch) + '.xlsx'
+        # df = pd.DataFrame(meanPerBatchOutputValid)
+        # df.to_excel(nameArch)
 
         if (epochs % plotStep_epochs) == (plotStep_epochs - 1):
             plt.figure(figEpochs)
@@ -322,7 +491,7 @@ def train3DModel(model, trainSet, validSet, criterion, optimizer, num_batch, epo
             # get the inputs
 
             inputs = torch.from_numpy(trainSet['input'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :]).to(device)
-            gt = torch.from_numpy(trainSet['output'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :]).to(device)
+            gt = (torch.from_numpy(trainSet['output'][i * batchSizeTrain:(i + 1) * batchSizeTrain, :, :, :]).to(device)) #- inputs
 
             if inputs.ndim == 4:
                 inputs = inputs.unsqueeze(1)
@@ -381,7 +550,7 @@ def train3DModel(model, trainSet, validSet, criterion, optimizer, num_batch, epo
 
         for i in range(numBatchesValid):
             vinputs = torch.from_numpy(validSet['input'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
-            vgt = torch.from_numpy(validSet['output'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device)
+            vgt = torch.from_numpy(validSet['output'][i * batchSizeValid:(i + 1) * batchSizeValid, :, :, :]).to(device) #- vinputs
 
             if vinputs.ndim == 4:
                 vinputs = vinputs.unsqueeze(1)
@@ -401,6 +570,9 @@ def train3DModel(model, trainSet, validSet, criterion, optimizer, num_batch, epo
             lossValuesDevSetEpoch.append(vloss.item())
         avg_vloss = np.mean(lossValuesDevSetEpoch)
         lossValuesDevSetAllEpoch.append(np.mean(lossValuesDevSetEpoch))
+
+        if numBatchesValid == 81 and numBatchesTrain==207:
+            algo = 0
 
         if (epochs % plotStep_epochs) == (plotStep_epochs - 1):
             plt.figure(figEpochs)
@@ -610,7 +782,7 @@ def covValuePerSlice(img, mask):
     '''
 
     masked = mask * img
-    masked = masked.reshape(masked.shape[0], -1)
+    #masked = masked.reshape(masked.shape[0], -1)
     meanValuePerSlice = meanPerSlice(masked)
     stdValuePerSlice = stdPerSlice(masked)
 
@@ -642,8 +814,8 @@ def crcValue(img, maskGrey, maskWhite):
 def meanPerSlice(masked):
 
     X = np.ma.masked_equal(masked, 0)
-    nonZeros = np.sum((~(X.mask)), axis=1)
-    pixelNonZeros = np.sum(masked, axis=1)
+    nonZeros = np.sum(np.sum((~(X.mask)),axis=-1), axis=-1)
+    pixelNonZeros = np.sum(np.sum(masked, axis=-1), axis=-1)
     meanPerSlice = pixelNonZeros/nonZeros
     meanPerSlice = np.nan_to_num(meanPerSlice)
     meanPerSlice.reshape(masked.shape[0], -1)
@@ -652,7 +824,10 @@ def meanPerSlice(masked):
 
 def stdPerSlice(masked):
 
-    stdPerSlice = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=1)
+    #stdPerSlice = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=1)
+    #stdPerSlice = np.nan_to_num(stdPerSlice)
+
+    stdPerSlice = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked), axis=(1, 2))
     stdPerSlice = np.nan_to_num(stdPerSlice)
     #stdPerSlice.reshape(stdPerSlice.shape[0], 1)
 
@@ -669,7 +844,10 @@ def meanPerSubject(masked):
     return meanPerSlice
 
 def stdPerSubject(masked):
-    stdForNonZeros = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=(1,2,3))
+    if masked.ndim == 4:
+        stdForNonZeros = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=(1,2,3))
+    if masked.ndim == 3:
+        stdForNonZeros = np.nanstd(np.where(np.equal(masked, 0), np.nan, masked),axis=(0,1,2))
     return stdForNonZeros
 
 
@@ -679,11 +857,11 @@ def crcValuePerSlice(img, maskGrey, maskWhite):
     '''
 
     maskedGrey = img * maskGrey
-    maskedGrey = maskedGrey.reshape(maskedGrey.shape[0], -1)
+    #maskedGrey = maskedGrey.reshape(maskedGrey.shape[0], -1)
     meanGreyMatterPerSlice = meanPerSlice(maskedGrey)
 
     maskedWhite = img * maskWhite
-    maskedWhite = maskedWhite.reshape(maskedWhite.shape[0], -1)
+    #maskedWhite = maskedWhite.reshape(maskedWhite.shape[0], -1)
     meanWhiteMatterPerSlice = meanPerSlice(maskedWhite)
 
     crcPerSlice = meanGreyMatterPerSlice / meanWhiteMatterPerSlice
@@ -731,19 +909,21 @@ def mseValuePerSlice(image1, image2, mask = []):
     mask = mask > 0
     cuadradoDeDif = ((image1*mask - image2*mask) ** 2)
     suma = np.sum(np.sum(cuadradoDeDif,axis=1),axis=1)
-    cantPix = np.sum(mask > 0)
+    cantPix = np.sum(np.sum(mask > 0,axis=1),axis=1)
     error = suma / cantPix
+    error = np.nan_to_num(error)
     return error
 
 def mseValuePerSubject(image1, image2, mask = []):
-    if mask == []:
+    if mask.size==0:
         mask = np.ones(image1.shape)
     # Force binary mask:
     mask = mask > 0
     cuadradoDeDif = ((image1*mask - image2*mask) ** 2)
-    suma = np.sum(np.sum(np.sum(cuadradoDeDif,axis=1),axis=1))
-    cantPix = np.sum(mask > 0)
+    suma = np.sum(np.sum(np.sum(cuadradoDeDif,axis=-1),axis=-1),axis=-1)
+    cantPix = np.sum(np.sum(np.sum(mask > 0,axis=-1),axis=-1),axis=-1)
     error = suma / cantPix
+    error = np.nan_to_num(error)
     return error
 
 def showPlotGlobalData(antesImages,modelsImages,filtersImages,sigmas,graphName,names,namesModel,saveFig = False , pathSave = None):

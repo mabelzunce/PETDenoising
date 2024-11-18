@@ -82,7 +82,8 @@ class AddResidual(nn.Module):
     def forward(self, x, residual):
         x = x + residual
         # Image has only positive values:
-        #x = self.relu(x) # Removing the relu as it is creating too many 0 zero values as negative values are all penalized in the same way.
+
+        # x = self.relu(x) # Removing the relu as it is creating too many 0 zero values as negative values are all penalized in the same way.
         return x
 
 class Unet(nn.Module):

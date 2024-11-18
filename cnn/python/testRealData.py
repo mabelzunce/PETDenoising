@@ -3,7 +3,9 @@ import skimage
 #from torchsummary import summary
 
 from unet import Unet
+from unet import UnetDe1a16Hasta512
 from unet import UnetWithResidual
+from unet import UnetWithResidual5Layers
 from utils import mseValuePerSlice
 from utils import mseValuePerSubject
 from utils import showDataPlot
@@ -18,13 +20,14 @@ from utils import meanPerSubject
 from utils import stdPerSubject
 from utils import RunModel
 from utils import saveDataCsv
+from unet import Unet512
 import SimpleITK as sitk
 import numpy as np
 import pandas as pd
 import os
 from sklearn.model_selection import train_test_split
 
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+device = torch.device('cuda:0' if torch.cuda.is_available() else 'cpu')
 print(device)
 
 ######## CONFIG ###########
@@ -51,22 +54,30 @@ path = os.getcwd()
 dataPath = '../../data/RealData/' + dataset + '/'
 
 # model
-nameModel = 'UnetResidual_MSE_lr5e-05_AlignTrue_randomScaleNew'.format(learning_rate)
+nameModel = 'PruebaMartin_Nueva_UnetResidual_MSE_lr1e-05_AlignTrue_MeanBrain'.format(learning_rate)
 
-modelsPath = '../../results/' + nameModel + '/models/'
+modelsPath = '../../results/newContrast/' + nameModel + '/models/'
 modelFilenames = os.listdir(modelsPath)
+doseToSave = 25
 
 # Normalize
 normSliceMeanStd = False
 normMeanSlice = False
 normMaxSlice = False
-model = UnetWithResidual(1,1)
-#model = Unet(1,1)
+normBrainMean = True
+normGreyMatterMean = False
+
+#model = UnetWithResidual(1,1)
+#model = UnetWithResidual5Layers(1,1)
+#model = UnetDe1a16Hasta512(1,1,16)
+model = Unet(1,1)
+
+#model= Unet512(1,1,32)
 
 #summary(model,(1,256,256))
 
 # Output
-pathSaveResults = '../../results/' + nameModel + '/'
+pathSaveResults = '../../results/newContrast/' + nameModel + '/'
 
 
 # leo las imagenes
@@ -107,28 +118,6 @@ for element in arrayPet:
 petImages = np.array(petImages)
 groundTruthSubject = np.array(groundTruthSubject).squeeze()
 
-if normSliceMeanStd == True:
-    meanSubjectNoisy = np.mean(np.mean(petImages, axis=-1), axis=-1)
-    stdSubjectNoisy = np.std(np.std(petImages, axis=-1), axis=-1)
-    stdSubjectNoisy = np.where(stdSubjectNoisy == 0, np.nan, stdSubjectNoisy)
-    subjectNoisyNorm = (petImages- meanSubjectNoisy[:,:, None, None]) / stdSubjectNoisy[:,:, None, None]
-    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
-
-if normMeanSlice == True:
-    meanSubjectNoisy = np.mean(np.mean(petImages, axis=-1), axis=-1)
-    meanSubjectNoisy = np.where(meanSubjectNoisy == 0, np.nan, meanSubjectNoisy)
-    subjectNoisyNorm = petImages / meanSubjectNoisy[:,:, None, None]
-    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
-
-if normMaxSlice == True:
-    maxSubjectNoisy = np.max(np.max(petImages, axis=-1), axis=-1)
-    maxSubjectNoisy = np.where(maxSubjectNoisy == 0, np.nan, maxSubjectNoisy)
-    subjectNoisyNorm = petImages / maxSubjectNoisy[:,:, None, None]
-    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
-
-if normSliceMeanStd == False and normMeanSlice == False and normMaxSlice == False:
-    petImagesNorm = petImages
-
 # ---------------------------- MASCARAS ----------------------------------------------- #
 
 whiteMatterMask_nii = sitk.ReadImage(dataPath+'mask/maskWhite.nii')
@@ -140,6 +129,51 @@ greyMatterMask_nii = sitk.ReadImage(dataPath+'mask/maskGrey.nii')
 greyMatterMask = sitk.GetArrayFromImage(greyMatterMask_nii)
 greyMatterMask = reshapeDataSet(greyMatterMask)
 greyMaskArray = torch.from_numpy(greyMatterMask)
+
+
+###### kinds of norm ####
+
+if normSliceMeanStd == True:
+    meanSubjectNoisy = np.mean(np.mean(petImages, axis=-1), axis=-1)
+    stdSubjectNoisy = np.std(np.std(petImages, axis=-1), axis=-1)
+    stdSubjectNoisy = np.where(stdSubjectNoisy == 0, np.nan, stdSubjectNoisy)
+    subjectNoisyNorm = (petImages - meanSubjectNoisy[:, :, None, None]) / stdSubjectNoisy[:, :, None, None]
+    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
+
+if normMeanSlice == True:
+    meanSubjectNoisy = np.mean(np.mean(petImages, axis=-1), axis=-1)
+    meanSubjectNoisy = np.where(meanSubjectNoisy == 0, np.nan, meanSubjectNoisy)
+    subjectNoisyNorm = petImages / meanSubjectNoisy[:, :, None, None]
+    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
+
+if normMaxSlice == True:
+    maxSubjectNoisy = np.max(np.max(petImages, axis=-1), axis=-1)
+    maxSubjectNoisy = np.where(maxSubjectNoisy == 0, np.nan, maxSubjectNoisy)
+    subjectNoisyNorm = petImages / maxSubjectNoisy[:, :, None, None]
+    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
+
+if normBrainMean == True:
+    BrainMask = whiteMaskArray + greyMaskArray
+    BrainMask = np.where(BrainMask != 0, 1, 0)
+
+    BrainMask = np.tile(BrainMask, ((petImages.shape)[0], 1, 1, 1, 1))
+
+    meanSliceTrainNoisy = (meanPerSlice(petImages[:, :, 0, :, :]* BrainMask[:, :, 0, :, :])).astype(np.float32)
+    subjectNoisyNorm = petImages/ meanSliceTrainNoisy[:,:, None, None, None]
+    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
+
+if normGreyMatterMean == True:
+    BrainMask = np.where(greyMaskArray != 0, 1, 0)
+
+    BrainMask = np.tile(BrainMask, ((petImages.shape)[0], 1, 1, 1, 1))
+
+    meanSliceTrainNoisy = (meanPerSlice(petImages[:, :, 0, :, :]* BrainMask[:, :, 0, :, :])).astype(np.float32)
+    subjectNoisyNorm = petImages/ meanSliceTrainNoisy[:,:, None, None, None]
+    petImagesNorm = np.nan_to_num(subjectNoisyNorm)
+
+
+if normSliceMeanStd == False and normMeanSlice == False and normMaxSlice == False and normBrainMean == False and normGreyMatterMean == False:
+    petImagesNorm = petImages
 
 ## CODE ##
 # Input images
@@ -213,11 +247,11 @@ for dose in range(0, len(petImages)):
 
     # METRICAS INPUT IMAGE
     mask = (noisyImagesSubject * greyMaskSubject)
-    meanGreyMatterInputImagePerSlice[dose, :] = meanPerSlice(mask.reshape(mask.shape[0], -1))
+    meanGreyMatterInputImagePerSlice[dose, :] = meanPerSlice(mask)
     mseGreyMatterInputImagePerSlice[dose, :] = mseValuePerSlice(noisyImagesSubject, groundTruthSubject, greyMaskSubject)
     #mseGreyMatterInputImagePerSubject[dose] = mseValuePerSubject(noisyImagesSubject, groundTruthSubject,greyMaskSubject)
     mask = (noisyImagesSubject * whiteMaskSubject)
-    meanWhiteMatterInputImagePerSlice[dose, :] = meanPerSlice(mask.reshape(mask.shape[0], -1))
+    meanWhiteMatterInputImagePerSlice[dose, :] = meanPerSlice(mask)
     crcInputImagePerSlice[dose, :] = crcValuePerSlice(noisyImagesSubject, greyMaskSubject, whiteMaskSubject)
     covInputImagePerSlice[dose, :] = covValuePerSlice(noisyImagesSubject, greyMaskSubject)
     crcInputImagePerSubject[dose] = crcValuePerSubject(noisyImagesSubject, greyMaskSubject, whiteMaskSubject)
@@ -245,11 +279,11 @@ for dose in range(0, len(petImages)):
             sitk.WriteImage(image, save_path)
 
         mask = (filter * greyMaskSubject)
-        meanGreyMatterFilterPerSlice[fil,dose,:] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
+        meanGreyMatterFilterPerSlice[fil,dose,:] = meanPerSlice(mask)
         mseGreyMatterFilterPerSlice[fil, dose, :] = mseValuePerSlice(filter, groundTruthSubject, greyMaskSubject)
         #mseGreyMatterFilterPerSubject[fil, dose] = mseValuePerSubject(filter, groundTruthSubject, greyMaskSubject)
         mask= (filter * whiteMaskSubject)
-        meanWhiteMatterFilterPerSlice[fil,dose, :] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
+        meanWhiteMatterFilterPerSlice[fil,dose, :] = meanPerSlice(mask)
 
         crcFilterPerSlice[fil, dose, :] = crcValuePerSlice(filter, greyMaskSubject, whiteMaskSubject)
         covFilterPerSlice[fil, dose, :] = covValuePerSlice(filter, greyMaskSubject)
@@ -275,13 +309,14 @@ for modelFilename in modelFilenames:
         # Get images for one subject as a torch tensor:
         noisyImagesSubject = petImagesNorm[dose, :, : , :]
 
+        print('Dose:',namesPet[dose])
+
         if batchSubjects:
             # Divido el dataSet
             numBatches = np.round(noisyImagesSubject.shape[0] / batchSubjectsSize).astype(int)
             # Run the model for all the slices:
             for i in range(numBatches):
-                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(
-                noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
+                outModel[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :] = RunModel(model, torch.from_numpy(noisyImagesSubject[i * batchSubjectsSize: (i + 1) * batchSubjectsSize, :, :, :])).detach().numpy()
             ndaOutputModel = outModel
         else:
             outModel = RunModel(model, torch.from_numpy(noisyImagesSubject))
@@ -295,7 +330,10 @@ for modelFilename in modelFilenames:
             ndaOutputModel = ndaOutputModel * meanSubjectNoisy[dose,:, None, None]
 
         if normMaxSlice:
-            ndaOutputModel = ndaOutputModel * maxSubjectNoisy[dose,:, None, None]
+            ndaOutputModel = ndaOutputModel * maxSubjectNoisy[dose,:,None, None]
+
+        if normBrainMean:
+            ndaOutputModel = ndaOutputModel * meanSliceTrainNoisy[dose,:,None, None, None]
 
         ndaOutputModel = ndaOutputModel.squeeze() # Remove the channel dimension
 
@@ -311,10 +349,11 @@ for modelFilename in modelFilenames:
         whiteMaskedImage = (ndaOutputModel * whiteMaskSubject)
 
         # Compute metrics for each subject all slices:
-        allModelsMeanGM[contModel,dose,:] = meanPerSlice((greyMaskedImage.reshape(greyMaskedImage.shape[0], -1)))
-        allModelsMeanWM[contModel, dose, :] = meanPerSlice((whiteMaskedImage.reshape(whiteMaskedImage.shape[0], -1)))
+        allModelsMeanGM[contModel,dose,:] = meanPerSlice((greyMaskedImage))
+        allModelsMeanWM[contModel, dose, :] = meanPerSlice((whiteMaskedImage))
         allModelsCrc[contModel,dose,:] = crcValuePerSlice(ndaOutputModel, greyMaskSubject, whiteMaskSubject)
         allModelsCov[contModel,dose,:] = covValuePerSlice(ndaOutputModel, greyMaskSubject)
+        allModelsMsePerSlice[contModel,dose,:] = mseValuePerSlice(ndaOutputModel, groundTruthSubject, greyMaskSubject)
 
         # Compute metrics for all subject :
         allModelsCRCperSubject[contModel,dose] = crcValuePerSubject(ndaOutputModel,greyMaskSubject,whiteMaskSubject)
@@ -323,40 +362,48 @@ for modelFilename in modelFilenames:
         allModelsMeanWMperSubject[contModel, dose] = meanPerSubject(allModelsMeanWM[contModel, dose, :])
         allModelsStdGreyMatterPerSubject[contModel, dose] = stdPerSubject(ndaOutputModel * greyMaskSubject)
         allModelsStdWhiteMatterPerSubject[contModel, dose] = stdPerSubject(ndaOutputModel * whiteMaskSubject)
+
         #allModelsGreyMatterMsePerSubject[contModel, dose] = mseValuePerSubject(ndaOutputModel, groundTruthSubject,greyMaskSubject)
 
         contModel = 0
 
-        meanGreyMatterFilterPerSlice[fil,dose,:] = meanPerSlice((mask.reshape(mask.shape[0], -1)))
+        meanGreyMatterFilterPerSlice[fil,dose,:] = meanPerSlice((mask))
 
 
 saveDataCsv(meanGreyMatterInputImagePerSlice.T, 'meanInputImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(crcInputImagePerSlice.T, 'crcInputImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(covInputImagePerSlice.T, 'covInputPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterInputImagePerSlice.T, 'mseInputPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterFilterPerSlice[1,:,:].T, 'meanFilter2mmImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(crcFilterPerSlice[1,:,:].T, 'crcFilter4mmPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(covFilterPerSlice[1,:,:].T, 'covFilterPer4mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterFilterPerSlice[1,:,:].T, 'mseFilterPer4mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterFilterPerSlice[2,:,:].T, 'meanFilter6mmImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(crcFilterPerSlice[2,:,:].T, 'crcFilter6mmPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(covFilterPerSlice[2,:,:].T, 'covFilterPer6mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterFilterPerSlice[2,:,:].T, 'mseFilterPer6mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterFilterPerSlice[3,:,:].T, 'meanFilter8mmImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(crcFilterPerSlice[3,:,:].T, 'crcFilter8mmPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(covFilterPerSlice[3,:,:].T, 'covFilterPer8mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterFilterPerSlice[3,:,:].T, 'mseFilterPer8mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterFilterPerSlice[4,:,:].T, 'meanFilter10mmImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(crcFilterPerSlice[4,:,:].T, 'crcFilter10mmPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(covFilterPerSlice[4,:,:].T, 'covFilterPer10mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterFilterPerSlice[4,:,:].T, 'mseFilterPer10mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(meanGreyMatterFilterPerSlice[5,:,:].T, 'meanFilter12mmImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(crcFilterPerSlice[5,:,:].T, 'crcFilter12mmPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(covFilterPerSlice[5,:,:].T, 'covFilterPer12mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(mseGreyMatterFilterPerSlice[5,:,:].T, 'mseFilterPer12mmSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 saveDataCsv(allModelsMeanGM.squeeze().T, 'meanOutputImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(allModelsCrc.squeeze().T, 'crcOutputImagePerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 saveDataCsv(allModelsCov.squeeze().T, 'covOutputPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
+saveDataCsv(allModelsMsePerSlice.squeeze().T, 'mseOutputPerSlice_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)
 
 
 # saveDataCsv(crcFilterPerSubject, 'crcFilterImage_RealData_'+dataset+'_'+nameModel+'.csv', pathSaveResults)

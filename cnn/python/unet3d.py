@@ -71,9 +71,12 @@ class OutConv(nn.Module):
     def __init__(self, in_ch, out_ch):
         super(OutConv, self).__init__()
         self.conv = nn.Conv3d(in_ch, out_ch, 1)
+        #self.relu = nn.ReLU(inplace=True)
 
     def forward(self, x):
         x = self.conv(x)
+        #x = self.relu(x)
+
         return x
 
 class AddResidual(nn.Module):
